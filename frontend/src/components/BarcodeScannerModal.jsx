@@ -88,21 +88,38 @@ export const BarcodeScannerModal = ({
     }, 1200);
   };
 
-  // Inisialisasi Kamera & Barcode Detector
+  // Inisialisasi Kamera & Barcode Detector dengan fallback bertahap
   const startCamera = async () => {
     try {
       setCameraError(null);
       scanningRef.current = false;
 
-      const constraints = {
-        video: {
-          facingMode: { ideal: 'environment' }, // Utamakan kamera belakang HP
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      };
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('Browser ini tidak mendukung akses kamera langsung melalui WebRTC.');
+        setCameraActive(false);
+        return;
+      }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream = null;
+
+      // 1. Coba kamera belakang terlebih dahulu (ideal untuk smartphone di bengkel)
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+      } catch (e1) {
+        // 2. Fallback ke webcam apa pun yang ada (Laptop / PC Webcam USB)
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (e2) {
+          throw e2;
+        }
+      }
+
       streamRef.current = stream;
 
       if (videoRef.current) {
@@ -113,7 +130,21 @@ export const BarcodeScannerModal = ({
       }
     } catch (err) {
       console.warn('Tidak dapat membuka kamera:', err);
-      setCameraError('Kamera tidak dapat diakses atau izin ditolak. Anda tetap dapat menggunakan input manual atau scanner barcode fisik.');
+      let message = 'Kamera tidak dapat diakses.';
+
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        message = 'Izin kamera ditolak di browser. Klik ikon di sebelah kiri alamat URL (di samping localhost:5173) lalu ubah opsi "Camera" menjadi "Allow / Izinkan".';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        message = 'Tidak ada perangkat kamera/webcam yang terdeteksi di komputer ini. Jika menggunakan PC desktop kasir, Anda bisa menggunakan alat Barcode Gun USB atau input manual di bawah. Pada HP Android/iPhone, kamera akan otomatis aktif.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        message = 'Kamera sedang digunakan oleh aplikasi lain (seperti Zoom/OBS/aplikasi kamera Windows).';
+      } else if (err.name === 'OverconstrainedError') {
+        message = 'Resolusi kamera yang diminta tidak didukung oleh perangkat ini.';
+      } else {
+        message = `Gagal membuka kamera (${err.message || err.name || 'Error'}). Silakan gunakan input manual atau Barcode Gun.`;
+      }
+
+      setCameraError(message);
       setCameraActive(false);
     }
   };
@@ -413,6 +444,31 @@ export const BarcodeScannerModal = ({
               Cek
             </button>
           </form>
+
+          {products && products.length > 0 && (
+            <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Coba tes cepat part:</span>
+              {products.slice(0, 4).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleBarcodeFound(p.sku || p.name)}
+                  style={{
+                    background: '#1e293b',
+                    color: '#cbd5e1',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                  }}
+                  title={`Klik untuk tes cek harga "${p.name}"`}
+                >
+                  {p.name.length > 20 ? p.name.slice(0, 20) + '...' : p.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* HASIL KARTU CEK HARGA */}
