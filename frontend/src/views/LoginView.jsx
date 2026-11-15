@@ -123,37 +123,6 @@ export const LoginView = ({ onLoginSuccess }) => {
             <IoLogInOutline size={20} />
             {loading ? 'Masuk ke Sistem...' : 'Login Sekarang'}
           </button>
-
-          <div style={{
-            marginTop: '1rem',
-            padding: '0.6rem 0.85rem',
-            background: 'rgba(220, 38, 38, 0.08)',
-            border: '1px solid rgba(220, 38, 38, 0.25)',
-            borderRadius: '8px',
-            fontSize: '0.78rem',
-            color: '#fca5a5',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <span>Akun Demo: <strong>admin</strong> / <strong>admin123</strong></span>
-            <button
-              type="button"
-              onClick={() => { setUsername('admin'); setPassword('admin123'); }}
-              style={{
-                background: '#dc2626',
-                border: 'none',
-                color: '#fff',
-                padding: '0.25rem 0.6rem',
-                borderRadius: '6px',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Isi Otomatis
-            </button>
-          </div>
         </form>
 
         <div style={{

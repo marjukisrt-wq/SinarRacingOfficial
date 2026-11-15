@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { IoPersonAddOutline, IoTrashOutline, IoPeopleOutline, IoShieldCheckmarkOutline } from 'react-icons/io5';
+import { IoPersonAddOutline, IoTrashOutline, IoPeopleOutline, IoShieldCheckmarkOutline, IoKeyOutline } from 'react-icons/io5';
 
 export const UserManagementView = () => {
   const [users, setUsers] = useState([]);
@@ -13,6 +13,16 @@ export const UserManagementView = () => {
   const [role, setRole] = useState('KASIR');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // Edit / Ganti Password Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editRole, setEditRole] = useState('KASIR');
+  const [editPassword, setEditPassword] = useState('');
+  const [editActive, setEditActive] = useState(true);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -27,6 +37,47 @@ export const UserManagementView = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenEdit = (user) => {
+    setSelectedUser(user);
+    setEditName(user.name);
+    setEditRole(user.role);
+    setEditActive(user.is_active);
+    setEditPassword('');
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    try {
+      setEditSaving(true);
+      setEditError(null);
+      const payload = {
+        name: editName,
+        role: editRole,
+        is_active: editActive,
+      };
+      if (editPassword && editPassword.trim().length > 0) {
+        if (editPassword.trim().length < 4) {
+          setEditError('Password baru minimal 4 karakter');
+          setEditSaving(false);
+          return;
+        }
+        payload.password = editPassword.trim();
+      }
+      await api.patch(`/users/${selectedUser.id}`, payload);
+      setShowEditModal(false);
+      fetchUsers();
+      alert(`Data dan password akun @${selectedUser.username} berhasil diperbarui!`);
+    } catch (err) {
+      console.error(err);
+      setEditError(err.response?.data?.message || 'Gagal memperbarui akun pengguna');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -167,16 +218,45 @@ export const UserManagementView = () => {
                       {u.is_active ? 'AKTIF' : 'NON-AKTIF'}
                     </span>
                   </td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                    {u.role !== 'SUPER_ADMIN' && (
+                  <td style={{ padding: '0.85rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                       <button
-                        onClick={() => handleDelete(u)}
-                        style={{ background: 'transparent', color: '#ef4444', padding: '4px' }}
-                        title="Hapus Akun"
+                        onClick={() => handleOpenEdit(u)}
+                        style={{
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          color: '#60a5fa',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                        }}
+                        title="Ubah Password & Akun"
                       >
-                        <IoTrashOutline size={18} />
+                        <IoKeyOutline size={14} /> Ganti Password
                       </button>
-                    )}
+
+                      {u.role !== 'SUPER_ADMIN' && (
+                        <button
+                          onClick={() => handleDelete(u)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.12)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            padding: '4px 6px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                          }}
+                          title="Hapus Akun"
+                        >
+                          <IoTrashOutline size={15} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -285,6 +365,118 @@ export const UserManagementView = () => {
                   }}
                 >
                   {saving ? 'Menyimpan...' : 'Buat Akun'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Akun & Ganti Password */}
+      {showEditModal && selectedUser && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h3>Edit Akun & Password (@{selectedUser.username})</h3>
+              <button className="modal-close-btn" onClick={() => setShowEditModal(false)}>
+                &times;
+              </button>
+            </div>
+
+            {editError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                color: '#f87171',
+                padding: '0.65rem',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                marginBottom: '1rem',
+              }}>
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateUser}>
+              <div className="form-group">
+                <label className="form-label">Nama Lengkap</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Ganti Password Baru</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="Kosongkan jika tidak ingin ganti password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                />
+                <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                  Isi hanya jika ingin mengubah kata sandi akun ini (minimal 4 karakter).
+                </small>
+              </div>
+
+              {selectedUser.role !== 'SUPER_ADMIN' && (
+                <div className="form-group">
+                  <label className="form-label">Peran (Hak Akses)</label>
+                  <select
+                    className="form-select"
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                  >
+                    <option value="KASIR">Kasir POS (Hanya Kasir & Cetak Struk)</option>
+                    <option value="GUDANG">Staf Gudang (Hanya Inventaris & Stok)</option>
+                    <option value="SUPER_ADMIN">Owner Bengkel (Akses Penuh)</option>
+                  </select>
+                </div>
+              )}
+
+              {selectedUser.role !== 'SUPER_ADMIN' && (
+                <div className="form-group">
+                  <label className="form-label">Status Akun</label>
+                  <select
+                    className="form-select"
+                    value={editActive ? 'active' : 'inactive'}
+                    onChange={(e) => setEditActive(e.target.value === 'active')}
+                  >
+                    <option value="active">Aktif (Dapat Login)</option>
+                    <option value="inactive">Non-Aktif (Diblokir dari Login)</option>
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  style={{
+                    padding: '0.75rem',
+                    background: 'transparent',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-muted)',
+                    borderRadius: '8px',
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  style={{
+                    padding: '0.75rem',
+                    background: 'var(--primary)',
+                    color: '#fff',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {editSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
                 </button>
               </div>
             </form>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { IoSettingsOutline, IoCheckmarkCircleOutline } from 'react-icons/io5';
+import { IoSettingsOutline, IoCheckmarkCircleOutline, IoLockClosedOutline, IoKeyOutline } from 'react-icons/io5';
 import { BrandLogo } from '../components/BrandLogo';
 
 export const SettingsView = () => {
@@ -12,6 +12,13 @@ export const SettingsView = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // State Ganti Password Sendiri
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
 
   useEffect(() => {
     fetchSettings();
@@ -54,6 +61,32 @@ export const SettingsView = () => {
       alert('Gagal menyimpan pengaturan profil toko');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (newPassword.length < 4) {
+      setPasswordError('Password baru minimal 4 karakter');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Konfirmasi password tidak cocok');
+      return;
+    }
+    try {
+      setPasswordSaving(true);
+      setPasswordError(null);
+      await api.patch('/auth/change-password', { new_password: newPassword });
+      setPasswordSuccess(true);
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch (err) {
+      console.error(err);
+      setPasswordError(err.response?.data?.message || 'Gagal mengubah password');
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -235,6 +268,114 @@ export const SettingsView = () => {
           >
             <IoCheckmarkCircleOutline size={20} />
             {saving ? 'Menyimpan...' : 'Simpan Pengaturan Profil'}
+          </button>
+        </form>
+      </div>
+
+      {/* KARTU GANTI PASSWORD AKUN SENDIRI */}
+      <div style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '12px',
+        padding: '1.5rem',
+        marginTop: '1.5rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '8px',
+            background: 'rgba(239, 68, 68, 0.15)',
+            color: '#ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.2rem',
+          }}>
+            <IoKeyOutline />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>Keamanan & Ganti Password</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Perbarui kata sandi akun yang sedang Anda gunakan saat ini
+            </p>
+          </div>
+        </div>
+
+        {passwordSuccess && (
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.15)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            color: '#34d399',
+            padding: '0.75rem',
+            borderRadius: '8px',
+            fontSize: '0.85rem',
+            marginBottom: '1rem',
+          }}>
+            ✓ Password berhasil diperbarui! Silakan gunakan password baru ini untuk login berikutnya.
+          </div>
+        )}
+
+        {passwordError && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            color: '#f87171',
+            padding: '0.75rem',
+            borderRadius: '8px',
+            fontSize: '0.85rem',
+            marginBottom: '1rem',
+          }}>
+            {passwordError}
+          </div>
+        )}
+
+        <form onSubmit={handleUpdatePassword}>
+          <div className="form-group">
+            <label className="form-label">Password Baru</label>
+            <input
+              type="password"
+              className="form-input"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Masukkan password baru (minimal 4 karakter)"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Konfirmasi Password Baru</label>
+            <input
+              type="password"
+              className="form-input"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Ketik ulang password baru Anda"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={passwordSaving}
+            style={{
+              padding: '0.75rem 1.25rem',
+              background: '#334155',
+              color: '#fff',
+              borderRadius: '8px',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+              width: '100%',
+              marginTop: '1rem',
+              border: '1px solid #475569',
+            }}
+          >
+            <IoLockClosedOutline size={18} />
+            {passwordSaving ? 'Menyimpan Password...' : 'Perbarui Password Saya'}
           </button>
         </form>
       </div>

@@ -96,4 +96,36 @@ module.exports = {
       return wrapper.response(response, 200, "Profil Pengguna", request.user);
     }
   },
+
+  changePassword: async (request, response) => {
+    try {
+      const userId = request.user.id;
+      const { current_password, new_password } = request.body;
+
+      if (!new_password || new_password.trim().length < 4) {
+        return wrapper.response(response, 400, "Password baru minimal 4 karakter");
+      }
+
+      const userRes = await userModel.getUserByUsername(request.user.username);
+      const user = userRes?.data;
+      if (!user) {
+        return wrapper.response(response, 404, "Data pengguna tidak ditemukan");
+      }
+
+      if (current_password) {
+        const isMatch = await bcrypt.compare(current_password, user.password);
+        if (!isMatch) {
+          return wrapper.response(response, 400, "Password saat ini salah");
+        }
+      }
+
+      const hashedPassword = await bcrypt.hash(new_password.trim(), 10);
+      await userModel.updateUser(userId, { password: hashedPassword });
+
+      return wrapper.response(response, 200, "Password berhasil diperbarui!");
+    } catch (error) {
+      console.error(error);
+      return wrapper.response(response, 500, "Gagal memperbarui password", error);
+    }
+  },
 };
