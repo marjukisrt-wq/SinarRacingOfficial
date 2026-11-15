@@ -107,7 +107,8 @@ export const LoginView = ({ onLoginSuccess }) => {
             style={{
               width: '100%',
               padding: '0.85rem',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.45)',
               color: '#fff',
               borderRadius: '8px',
               fontWeight: 700,
@@ -126,11 +127,11 @@ export const LoginView = ({ onLoginSuccess }) => {
           <div style={{
             marginTop: '1rem',
             padding: '0.6rem 0.85rem',
-            background: 'rgba(37, 99, 235, 0.08)',
-            border: '1px solid rgba(37, 99, 235, 0.25)',
+            background: 'rgba(220, 38, 38, 0.08)',
+            border: '1px solid rgba(220, 38, 38, 0.25)',
             borderRadius: '8px',
             fontSize: '0.78rem',
-            color: '#93c5fd',
+            color: '#fca5a5',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -140,7 +141,7 @@ export const LoginView = ({ onLoginSuccess }) => {
               type="button"
               onClick={() => { setUsername('admin'); setPassword('admin123'); }}
               style={{
-                background: '#2563eb',
+                background: '#dc2626',
                 border: 'none',
                 color: '#fff',
                 padding: '0.25rem 0.6rem',

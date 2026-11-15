@@ -112,12 +112,12 @@ export const SettingsView = () => {
           padding: '1rem',
           marginBottom: '1.25rem',
         }}>
-          <h4 style={{ fontSize: '0.9rem', marginBottom: '0.65rem', color: '#93c5fd' }}>
-            Branding & Vector Emblem: Sinar Racing Official
+          <h4 style={{ fontSize: '0.9rem', marginBottom: '0.65rem', color: '#f87171' }}>
+            Identitas & Logo Resmi: Sinar Racing Official
           </h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div style={{
-              background: '#0b0f19',
+              background: '#0a0d14',
               padding: '1rem',
               borderRadius: '8px',
               textAlign: 'center',
@@ -128,7 +128,7 @@ export const SettingsView = () => {
               justifyContent: 'center'
             }}>
               <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.65rem' }}>
-                Logo Aplikasi (Pure Vector SVG)
+                Logo Resmi Bengkel (Aplikasi)
               </span>
               <BrandLogo variant="horizontal" size="sm" />
             </div>
@@ -145,13 +145,13 @@ export const SettingsView = () => {
               justifyContent: 'center'
             }}>
               <span style={{ fontSize: '0.75rem', color: '#475569', display: 'block', marginBottom: '0.65rem', fontWeight: 600 }}>
-                Emblem Struk Thermal (Monochrome Vector)
+                Logo Struk Thermal (Monochrome 58mm)
               </span>
               <BrandLogo variant="thermal" size="sm" />
             </div>
           </div>
           <p style={{ fontSize: '0.76rem', color: '#94a3b8', marginTop: '0.65rem' }}>
-            ✓ Vector SVG modern — tajam tanpa pixelate di HP, Tablet, Laptop, dan Struk Thermal.
+            ✓ Logo otomatis dicetak di bagian paling atas struk saat menggunakan printer Bluetooth thermal maupun Cetak Standar.
           </p>
         </div>
 
