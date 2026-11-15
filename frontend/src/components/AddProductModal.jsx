@@ -301,6 +301,46 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
             </div>
           )}
 
+          {!isService && (
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Kode Barcode / SKU Part</span>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Dapat di-scan dengan HP / Barcode Gun</span>
+              </label>
+              <div style={{ display: 'flex', gap: '0.45rem' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Contoh: AHM-06455-KVB-T01 atau SRM-89412"
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const randCode = 'SRM-' + Math.floor(100000 + Math.random() * 900000);
+                    setSku(randCode);
+                  }}
+                  style={{
+                    background: '#1e293b',
+                    color: '#facc15',
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    padding: '0 0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Generate kode barcode acak otomatis"
+                >
+                  🎲 Buat Barcode
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label">Harga Modal / Beli</label>

@@ -8,7 +8,8 @@ import {
   IoPeopleOutline, 
   IoSettingsOutline, 
   IoLogOutOutline,
-  IoSpeedometer
+  IoSpeedometer,
+  IoBuildOutline
 } from 'react-icons/io5';
 import { FaMotorcycle } from 'react-icons/fa6';
 
@@ -61,6 +62,17 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
               >
                 <IoTimeOutline size={18} />
                 <span>Riwayat Transaksi</span>
+              </button>
+            )}
+
+            {/* 3b. Rekap Jasa & Staf Mekanik */}
+            {(isSuperAdmin || isKasir) && (
+              <button
+                className={`nav-btn ${activeTab === 'mechanics' ? 'active' : ''}`}
+                onClick={() => setActiveTab('mechanics')}
+              >
+                <IoBuildOutline size={18} />
+                <span>Mekanik & Jasa</span>
               </button>
             )}
 
@@ -149,6 +161,16 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
           >
             <IoTimeOutline size={20} />
             <span>Riwayat</span>
+          </button>
+        )}
+
+        {(isSuperAdmin || isKasir) && (
+          <button
+            className={`mobile-nav-item ${activeTab === 'mechanics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('mechanics')}
+          >
+            <IoBuildOutline size={20} />
+            <span>Mekanik</span>
           </button>
         )}
 

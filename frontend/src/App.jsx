@@ -6,6 +6,7 @@ import { InventoryView } from './views/InventoryView';
 import { TransactionsView } from './views/TransactionsView';
 import { UserManagementView } from './views/UserManagementView';
 import { SettingsView } from './views/SettingsView';
+import { MechanicsView } from './views/MechanicsView';
 import { LoginView } from './views/LoginView';
 import { BrandLogo } from './components/BrandLogo';
 
@@ -68,6 +69,8 @@ const MainApp = () => {
           <InventoryView />
         ) : activeTab === 'transactions' && (isSuperAdmin || isKasir) ? (
           <TransactionsView onNavigateToPos={() => setActiveTab('pos')} />
+        ) : activeTab === 'mechanics' && (isSuperAdmin || isKasir) ? (
+          <MechanicsView />
         ) : activeTab === 'users' && isSuperAdmin ? (
           <UserManagementView />
         ) : activeTab === 'settings' && isSuperAdmin ? (

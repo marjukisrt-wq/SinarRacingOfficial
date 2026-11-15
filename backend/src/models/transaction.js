@@ -24,11 +24,21 @@ module.exports = {
       unit_price: Number(item.unit_price),
       quantity: Number(item.quantity),
       subtotal: Number(item.subtotal || item.unit_price * item.quantity),
+      mechanic_id: item.mechanic_id ? Number(item.mechanic_id) : null,
+      mechanic_name: item.mechanic_name || null,
     }));
 
-    const { error: itemsError } = await supabase
+    let { error: itemsError } = await supabase
       .from("transaction_items")
       .insert(itemsToInsert);
+
+    // Jika kolom mechanic_id / mechanic_name belum ada di tabel Supabase
+    if (itemsError && itemsError.message && itemsError.message.includes("mechanic")) {
+      console.warn("Kolom mechanic belum ada di Supabase, menyimpan item tanpa kolom mechanic:", itemsError.message);
+      const cleanItems = itemsToInsert.map(({ mechanic_id, mechanic_name, ...rest }) => rest);
+      const retryResult = await supabase.from("transaction_items").insert(cleanItems);
+      itemsError = retryResult.error;
+    }
 
     if (itemsError) {
       throw itemsError;

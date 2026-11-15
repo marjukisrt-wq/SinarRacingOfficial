@@ -213,6 +213,11 @@ export const ThermalReceipt = ({ transaction, store, onClose }) => {
               <div className="receipt-bold" style={{ fontSize: '11px' }}>
                 {it.is_manual ? `[LUAR] ${it.product_name}` : (it.is_service ? `[JASA] ${it.product_name}` : it.product_name)}
               </div>
+              {it.is_service && it.mechanic_name && (
+                <div style={{ fontSize: '9.5px', color: '#555', fontStyle: 'italic', paddingLeft: '4px' }}>
+                  (Mekanik: {it.mechanic_name})
+                </div>
+              )}
               <div className="receipt-row" style={{ fontSize: '11px' }}>
                 <span>  {it.quantity} x {formatNumber(it.unit_price)}</span>
                 <span>{formatNumber(it.subtotal)}</span>

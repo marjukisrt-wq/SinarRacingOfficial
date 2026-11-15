@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { formatCurrency, formatNumber } from '../utils/bluetoothPrinter';
 import { ThermalReceipt } from '../components/ThermalReceipt';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
+import {
+  initOfflineSync,
+  isOnline,
+  enqueueOfflineTransaction,
+  getOfflineQueue,
+  syncOfflineQueue,
+  saveCatalogCache,
+  getCachedCatalog,
+} from '../utils/offlineSync';
 
 // Format angka menjadi ribuan Rupiah (contoh: 10000 -> "10.000")
 const formatRupiahInput = (val) => {
@@ -34,7 +44,11 @@ import {
   IoTimeOutline,
   IoDocumentTextOutline,
   IoCloseCircleOutline,
-  IoSaveOutline
+  IoSaveOutline,
+  IoBarcodeOutline,
+  IoCloudDoneOutline,
+  IoCloudOfflineOutline,
+  IoSyncOutline
 } from 'react-icons/io5';
 
 export const PosView = () => {
@@ -76,6 +90,50 @@ export const PosView = () => {
   const [processingOrder, setProcessingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
+  // Data Mekanik Bengkel
+  const [mechanics, setMechanics] = useState([]);
+
+  // Scanner Barcode (Cek Harga & POS)
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerMode, setScannerMode] = useState('CHECK_PRICE'); // 'CHECK_PRICE' atau 'ADD_TO_CART'
+
+  // Mode Offline & Sinkronisasi
+  const [isDeviceOnline, setIsDeviceOnline] = useState(isOnline());
+  const [offlineCount, setOfflineCount] = useState(getOfflineQueue().length);
+  const [isSyncingOffline, setIsSyncingOffline] = useState(false);
+
+  const fetchMechanics = async () => {
+    try {
+      const res = await api.get('/mechanics');
+      setMechanics(res.data?.data || []);
+    } catch (err) {
+      console.warn('Gagal mengambil daftar mekanik:', err);
+    }
+  };
+
+  const handleManualSyncNow = async () => {
+    if (!isOnline()) {
+      alert('Perangkat Anda masih dalam keadaan offline (tidak ada sinyal/internet). Sinkronisasi akan otomatis berjalan begitu internet kembali terhubung.');
+      return;
+    }
+    try {
+      setIsSyncingOffline(true);
+      const res = await syncOfflineQueue(api);
+      if (res.synced > 0) {
+        alert(`✓ Berhasil menyinkronkan ${res.synced} transaksi offline ke database cloud!`);
+        fetchProducts();
+        fetchDrafts();
+      } else {
+        alert('Tidak ada transaksi offline yang menunggu sinkronisasi.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Gagal menyinkronkan: ' + (e.message || 'Koneksi bermasalah'));
+    } finally {
+      setIsSyncingOffline(false);
+    }
+  };
+
   const fetchDrafts = async () => {
     try {
       // Migrasikan draft lokal lama ke server database (jika ada) agar bisa diakses multi-device
@@ -115,6 +173,26 @@ export const PosView = () => {
     fetchBrands();
     fetchStoreSettings();
     fetchDrafts();
+    fetchMechanics();
+
+    // Inisialisasi Auto Offline Sync
+    const cleanupSync = initOfflineSync(api, (msg) => {
+      alert(msg);
+      fetchProducts();
+      fetchDrafts();
+    });
+
+    const updateOnlineStatus = () => {
+      setIsDeviceOnline(isOnline());
+    };
+
+    const handleOfflineQueueUpdate = (e) => {
+      setOfflineCount(e.detail?.count ?? getOfflineQueue().length);
+    };
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    window.addEventListener('sinarracing:offline_queue_updated', handleOfflineQueueUpdate);
 
     // Polling antrean draft setiap 12 detik agar laptop owner & kasir selalu sinkron
     const interval = setInterval(fetchDrafts, 12000);
@@ -142,6 +220,10 @@ export const PosView = () => {
     window.addEventListener('monesca_load_draft', handleCustomLoadDraft);
     return () => {
       clearInterval(interval);
+      if (typeof cleanupSync === 'function') cleanupSync();
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+      window.removeEventListener('sinarracing:offline_queue_updated', handleOfflineQueueUpdate);
       window.removeEventListener('sinarracing_load_draft', handleCustomLoadDraft);
       window.removeEventListener('monesca_load_draft', handleCustomLoadDraft);
     };
@@ -182,9 +264,34 @@ export const PosView = () => {
       }
 
       const res = await api.get('/products', { params });
-      setProducts(res.data?.data || []);
+      const data = res.data?.data || [];
+      setProducts(data);
+
+      // Simpan ke offline cache jika sedang mengambil katalog default
+      if (!search.trim() && selectedBrand === 'ALL') {
+        saveCatalogCache(data);
+      }
     } catch (err) {
-      console.error(err);
+      console.warn('Gagal mengambil produk dari server, memuat dari cache offline lokal:', err);
+      // Fallback ke offline cache
+      const cached = getCachedCatalog();
+      if (cached && cached.length > 0) {
+        let filtered = cached;
+        if (search.trim()) {
+          const q = search.trim().toLowerCase();
+          filtered = filtered.filter(p =>
+            (p.name || '').toLowerCase().includes(q) ||
+            (p.sku || '').toLowerCase().includes(q) ||
+            (p.motor_compatibility || '').toLowerCase().includes(q)
+          );
+        }
+        if (selectedBrand === 'SERVICE') {
+          filtered = filtered.filter(p => p.is_service);
+        } else if (selectedBrand !== 'ALL') {
+          filtered = filtered.filter(p => String(p.brand_id) === String(selectedBrand));
+        }
+        setProducts(filtered);
+      }
     } finally {
       setLoading(false);
     }
@@ -348,15 +455,47 @@ export const PosView = () => {
         discount: Number(discount) || 0,
         payment_method: paymentMethod,
         cash_given: totalCashReceived,
+        change_due: changeDue,
         notes: finalNotes,
-        items: cart,
+        items: cart.map((it) => ({
+          ...it,
+          mechanic_id: it.mechanic_id ? Number(it.mechanic_id) : null,
+          mechanic_name: it.mechanic_name || null,
+        })),
       };
 
-      const res = await api.post('/transactions', payload);
-      const { transaction, store } = res.data.data;
+      let finalTransaction = null;
+      let finalStore = storeSettings;
 
-      // Segarkan daftar draft dari database cloud
-      await fetchDrafts();
+      // Cek apakah perangkat sedang offline
+      if (!isOnline()) {
+        finalTransaction = enqueueOfflineTransaction({
+          ...payload,
+          subtotal,
+          total_amount: totalAmount,
+        });
+        alert('Mode Offline: Internet tidak tersedia. Transaksi berhasil disimpan secara lokal dan struk kasir siap dicetak! Transaksi akan otomatis tersinkron ke server cloud saat internet online.');
+      } else {
+        try {
+          const res = await api.post('/transactions', payload);
+          finalTransaction = res.data.data.transaction;
+          if (res.data.data.store) finalStore = res.data.data.store;
+          await fetchDrafts();
+        } catch (postErr) {
+          // Tangani kemungkinan sinyal mendadak hilang / timeout saat klik bayar
+          if (!postErr.response || postErr.code === 'ERR_NETWORK') {
+            finalTransaction = enqueueOfflineTransaction({
+              ...payload,
+              subtotal,
+              total_amount: totalAmount,
+            });
+            alert('Mode Offline: Terjadi gangguan jaringan mendadak. Transaksi dialihkan dan disimpan secara lokal. Struk siap dicetak!');
+          } else {
+            throw postErr;
+          }
+        }
+      }
+
       setActiveDraftId(null);
 
       // Bersihkan keranjang kasir
@@ -374,8 +513,8 @@ export const PosView = () => {
       fetchProducts();
 
       // Buka pop-up Struk Thermal Bluetooth
-      setCompletedTransaction(transaction);
-      if (store) setStoreSettings(store);
+      if (finalTransaction) setCompletedTransaction(finalTransaction);
+      if (finalStore) setStoreSettings(finalStore);
     } catch (err) {
       console.error(err);
       setErrorMessage(err.response?.data?.message || 'Gagal memproses transaksi kasir');
@@ -412,10 +551,28 @@ export const PosView = () => {
             is_service: product.is_service,
             max_stock: product.stock,
             is_manual: false,
+            mechanic_id: null,
+            mechanic_name: '',
           },
         ];
       }
     });
+  };
+
+  const updateCartItemMechanic = (identifier, mechanicId, mechanicName) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        const match = (item.cart_item_id && item.cart_item_id === identifier) || item.product_id === identifier;
+        if (match) {
+          return {
+            ...item,
+            mechanic_id: mechanicId,
+            mechanic_name: mechanicName,
+          };
+        }
+        return item;
+      })
+    );
   };
 
   const updateQuantity = (identifier, delta) => {
@@ -469,6 +626,8 @@ export const PosView = () => {
       is_service: manualIsService,
       max_stock: 9999,
       is_manual: true,
+      mechanic_id: null,
+      mechanic_name: '',
     };
 
     setCart((prev) => [...prev, newItem]);
@@ -621,6 +780,33 @@ export const PosView = () => {
                   <div className="cart-item-sub">
                     {formatCurrency(item.unit_price)}
                   </div>
+                  {item.is_service && (
+                    <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Mekanik:</span>
+                      <select
+                        value={item.mechanic_name || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const found = mechanics.find(m => m.name === val);
+                          updateCartItemMechanic(item.cart_item_id || item.product_id, found ? found.id : null, val);
+                        }}
+                        style={{
+                          background: '#090d16',
+                          border: '1px solid #334155',
+                          borderRadius: '4px',
+                          color: item.mechanic_name ? '#facc15' : '#94a3b8',
+                          fontSize: '0.72rem',
+                          padding: '2px 5px',
+                          outline: 'none',
+                        }}
+                      >
+                        <option value="">-- Pilih Mekanik --</option>
+                        {mechanics.filter(m => m.is_active).map(m => (
+                          <option key={m.id} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="cart-item-stepper">
@@ -1176,16 +1362,134 @@ export const PosView = () => {
             </button>
           </div>
 
-          {/* Search Input */}
-          <div className="search-wrapper">
-            <IoSearchOutline className="search-icon" />
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Cari part/motor (misal: 'kampas vario', 'oli mpx', 'roller beat')..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          {/* Bar Status Offline / Sinkronisasi */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            padding: '0.65rem 0.85rem',
+            background: isDeviceOnline ? (offlineCount > 0 ? 'rgba(234, 179, 8, 0.12)' : 'rgba(34, 197, 94, 0.1)') : 'rgba(239, 68, 68, 0.15)',
+            border: `1px solid ${isDeviceOnline ? (offlineCount > 0 ? '#eab308' : 'rgba(34, 197, 94, 0.3)') : '#ef4444'}`,
+            borderRadius: '10px',
+            marginBottom: '0.75rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+              {isDeviceOnline ? (
+                offlineCount > 0 ? (
+                  <>
+                    <IoSyncOutline className="spin" size={18} style={{ color: '#eab308' }} />
+                    <span style={{ color: '#fef08a', fontWeight: 600 }}>
+                      Online • <strong>{offlineCount} transaksi offline</strong> menunggu sinkronisasi
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <IoCloudDoneOutline size={18} style={{ color: '#4ade80' }} />
+                    <span style={{ color: '#86efac', fontWeight: 600 }}>
+                      Sistem Kasir Online • Terhubung ke Server Cloud
+                    </span>
+                  </>
+                )
+              ) : (
+                <>
+                  <IoCloudOfflineOutline size={18} style={{ color: '#f87171' }} />
+                  <span style={{ color: '#fca5a5', fontWeight: 700 }}>
+                    Mode Offline Aktif • Transaksi kasir & cetak struk tetap berfungsi normal
+                  </span>
+                </>
+              )}
+            </div>
+
+            {offlineCount > 0 && isDeviceOnline && (
+              <button
+                type="button"
+                onClick={handleManualSyncNow}
+                disabled={isSyncingOffline}
+                style={{
+                  background: '#eab308',
+                  color: '#0f172a',
+                  border: 'none',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+              >
+                <IoSyncOutline size={14} className={isSyncingOffline ? 'spin' : ''} />
+                {isSyncingOffline ? 'Menyinkronkan...' : 'Sinkronkan Sekarang'}
+              </button>
+            )}
+          </div>
+
+          {/* Search Input & Tombol Barcode */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <div className="search-wrapper" style={{ flex: 1, minWidth: '220px', margin: 0 }}>
+              <IoSearchOutline className="search-icon" />
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Cari part/motor (misal: 'kampas vario', 'oli mpx', 'roller beat')..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Tombol Cek Harga */}
+            <button
+              type="button"
+              onClick={() => {
+                setScannerMode('CHECK_PRICE');
+                setScannerOpen(true);
+              }}
+              style={{
+                background: '#1e293b',
+                color: '#facc15',
+                border: '1px solid rgba(250, 204, 21, 0.4)',
+                borderRadius: '8px',
+                padding: '0.65rem 0.85rem',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                cursor: 'pointer',
+              }}
+              title="Arahkan kamera untuk cek harga & sisa stok barang"
+            >
+              <IoBarcodeOutline size={18} /> Cek Harga
+            </button>
+
+            {/* Tombol Scan Barcode Kasir */}
+            <button
+              type="button"
+              onClick={() => {
+                setScannerMode('ADD_TO_CART');
+                setScannerOpen(true);
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0.65rem 0.85rem',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.4)',
+              }}
+              title="Scan barcode part motor untuk langsung masuk ke keranjang kasir"
+            >
+              <IoBarcodeOutline size={18} /> + Scan Kasir
+            </button>
           </div>
 
           {/* Grid Produk */}
@@ -1577,6 +1881,14 @@ export const PosView = () => {
           </div>
         </div>
       )}
+      {/* Modal Scanner Barcode Kamera HP / Laptop */}
+      <BarcodeScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        mode={scannerMode}
+        products={products}
+        onAddToCart={addToCart}
+      />
     </div>
   );
 };

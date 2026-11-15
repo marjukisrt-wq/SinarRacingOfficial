@@ -10,6 +10,7 @@ const transactionRoutes = require("./transaction");
 const stockMovementRoutes = require("./stockMovement");
 const storeSettingsRoutes = require("./storeSettings");
 const uploadRoutes = require("./upload");
+const mechanicRoutes = require("./mechanic");
 
 Router.get("/health", (request, response) => {
   response.status(200).json({
@@ -28,5 +29,6 @@ Router.use("/transactions", transactionRoutes);
 Router.use("/stock-movements", stockMovementRoutes);
 Router.use("/settings", storeSettingsRoutes);
 Router.use("/upload", uploadRoutes);
+Router.use("/mechanics", mechanicRoutes);
 
 module.exports = Router;

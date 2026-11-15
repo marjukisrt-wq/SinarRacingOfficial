@@ -436,7 +436,10 @@ export const printViaWebBluetooth = async (transaction, store, options = {}) => 
     const items = transaction.items || [];
     for (const item of items) {
       const prefix = item.is_manual ? '[LUAR] ' : (item.is_service ? '[JASA] ' : '');
-      const itemName = `${prefix}${item.product_name}`;
+      let itemName = `${prefix}${item.product_name}`;
+      if (item.is_service && item.mechanic_name) {
+        itemName += ` (${item.mechanic_name})`;
+      }
       text += itemName + '\n';
       const detailLeft = `  ${item.quantity} x ${formatNumber(item.unit_price)}`;
       const detailRight = formatNumber(item.subtotal);
@@ -485,7 +488,10 @@ export const printViaWebBluetooth = async (transaction, store, options = {}) => 
     const items = transaction.items || [];
     for (const item of items) {
       const prefix = item.is_manual ? '[LUAR] ' : (item.is_service ? '[JASA] ' : '');
-      const itemName = `${prefix}${item.product_name}`;
+      let itemName = `${prefix}${item.product_name}`;
+      if (item.is_service && item.mechanic_name) {
+        itemName += ` (${item.mechanic_name})`;
+      }
       text += itemName + '\n';
       const detailLeft = `  ${item.quantity} x ${formatNumber(item.unit_price)}`;
       const detailRight = formatNumber(item.subtotal);

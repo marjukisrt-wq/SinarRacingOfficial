@@ -4,6 +4,8 @@ import { formatCurrency, formatNumber } from '../utils/bluetoothPrinter';
 import { useAuth } from '../context/AuthContext';
 import { AddProductModal } from '../components/AddProductModal';
 import { QuickRestockModal } from '../components/QuickRestockModal';
+import { BarcodeLabelModal } from '../components/BarcodeLabelModal';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import { 
   IoAddOutline, 
   IoSearchOutline, 
@@ -12,7 +14,8 @@ import {
   IoCreateOutline, 
   IoTrashOutline,
   IoTimeOutline,
-  IoRefreshOutline
+  IoRefreshOutline,
+  IoBarcodeOutline
 } from 'react-icons/io5';
 
 export const InventoryView = () => {
@@ -34,6 +37,11 @@ export const InventoryView = () => {
   const [productToRestock, setProductToRestock] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [movements, setMovements] = useState([]);
+
+  // Barcode & Label
+  const [selectedProductForLabel, setSelectedProductForLabel] = useState(null);
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
 
   useEffect(() => {
     fetchBrands();
@@ -310,8 +318,28 @@ export const InventoryView = () => {
           </button>
         </div>
 
-        {/* Tombol Tambah Barang & Mutasi */}
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
+        {/* Tombol Tambah Barang, Scan Barcode & Mutasi */}
+        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowScannerModal(true)}
+            style={{
+              padding: '0.6rem 0.9rem',
+              background: '#1e293b',
+              border: '1px solid rgba(250, 204, 21, 0.4)',
+              color: '#facc15',
+              borderRadius: '8px',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              cursor: 'pointer',
+            }}
+            title="Scan barcode part menggunakan kamera untuk cek stok & harga"
+          >
+            <IoBarcodeOutline size={18} /> Cek Barcode
+          </button>
+
           <button
             onClick={fetchMovements}
             style={{
@@ -466,6 +494,32 @@ export const InventoryView = () => {
 
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
+                        {/* Tombol Cetak Label Stiker Barcode */}
+                        {!p.is_service && (
+                          <button
+                            onClick={() => {
+                              setSelectedProductForLabel(p);
+                              setShowLabelModal(true);
+                            }}
+                            style={{
+                              padding: '4px 7px',
+                              background: 'rgba(250, 204, 21, 0.15)',
+                              color: '#facc15',
+                              border: '1px solid rgba(250, 204, 21, 0.35)',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '2px',
+                            }}
+                            title="Cetak Stiker Label Barcode untuk ditempel ke part motor"
+                          >
+                            <IoBarcodeOutline size={13} /> Label
+                          </button>
+                        )}
+
                         {/* Tombol Cepat Tambah / Koreksi Stok (Khusus Admin bisa koreksi langsung) */}
                         {!p.is_service && (
                           <button
@@ -604,6 +658,23 @@ export const InventoryView = () => {
           </div>
         </div>
       )}
+      {/* Modal Cetak Label Barcode Stiker Part */}
+      <BarcodeLabelModal
+        isOpen={showLabelModal}
+        onClose={() => {
+          setShowLabelModal(false);
+          setSelectedProductForLabel(null);
+        }}
+        product={selectedProductForLabel}
+      />
+
+      {/* Modal Scan Barcode & Cek Harga Cepat */}
+      <BarcodeScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        mode="CHECK_PRICE"
+        products={products}
+      />
     </div>
   );
 };

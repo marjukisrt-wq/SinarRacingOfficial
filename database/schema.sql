@@ -156,6 +156,25 @@ CREATE INDEX idx_transactions_invoice ON transactions(invoice_number);
 CREATE INDEX idx_transactions_created ON transactions(created_at DESC);
 
 -- ====================================================================
+-- 8b. TABEL DATA MEKANIK BENGKEL (MECHANICS)
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS mechanics (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(50),
+    commission_rate NUMERIC(5, 2) NOT NULL DEFAULT 50.00, -- Persentase bagi hasil jasa (50%)
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed Data Mekanik Awal
+INSERT INTO mechanics (name, phone, commission_rate) VALUES
+('Agus Pratama', '0812-3456-7891', 50.00),
+('Budi Santoso', '0812-3456-7892', 50.00),
+('Doni Setiawan', '0812-3456-7893', 50.00);
+
+-- ====================================================================
 -- 9. TABEL DETAIL BARANG & JASA TERJUAL (TRANSACTION_ITEMS)
 -- ====================================================================
 CREATE TABLE transaction_items (
@@ -169,6 +188,8 @@ CREATE TABLE transaction_items (
     unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
     quantity INT NOT NULL DEFAULT 1,
     subtotal NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    mechanic_id INT REFERENCES mechanics(id) ON DELETE SET NULL,
+    mechanic_name VARCHAR(100),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
