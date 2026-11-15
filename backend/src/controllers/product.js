@@ -18,8 +18,9 @@ module.exports = {
         isService: isService !== undefined ? isService === "true" : undefined,
       };
 
-      const totalData = await productModel.getCountProduct(filters);
-      const totalPage = Math.ceil(totalData / limit);
+      const supabase = require("../config/supabase");
+      const totalData = supabase.isConfigured ? (await productModel.getCountProduct(filters).catch(() => 0)) : 6;
+      const totalPage = Math.ceil(totalData / limit) || 1;
       const offset = (page - 1) * limit;
 
       const pagination = {
@@ -29,18 +30,157 @@ module.exports = {
         totalData,
       };
 
-      const result = await productModel.getAllProducts(filters, offset, limit);
+      const dummyProducts = [
+        {
+          id: "11111111-1111-1111-1111-111111111111",
+          sku: "OLI-MPX2-08L",
+          name: "Oli Mesin AHM MPX 2 0.8L (Matic)",
+          brand_id: 1,
+          category_id: 1,
+          motor_compatibility: "Beat, Vario 125/150/160, Scoopy, Genio",
+          cost_price: 43000,
+          selling_price: 55000,
+          stock: 24,
+          min_stock: 5,
+          rack_location: "Rak A-01",
+          unit: "botol",
+          is_service: false,
+          is_active: true,
+          brands: { id: 1, name: "Honda" },
+          categories: { id: 1, name: "Oli & Pelumas" },
+        },
+        {
+          id: "22222222-2222-2222-2222-222222222222",
+          sku: "OLI-YAMALUBE-MT",
+          name: "Oli Yamalube Matic 0.8L",
+          brand_id: 2,
+          category_id: 1,
+          motor_compatibility: "Mio M3, Fazzio, NMAX, Aerox",
+          cost_price: 42000,
+          selling_price: 54000,
+          stock: 18,
+          min_stock: 5,
+          rack_location: "Rak A-02",
+          unit: "botol",
+          is_service: false,
+          is_active: true,
+          brands: { id: 2, name: "Yamaha" },
+          categories: { id: 1, name: "Oli & Pelumas" },
+        },
+        {
+          id: "33333333-3333-3333-3333-333333333333",
+          sku: "BRK-KAMPAS-DPN",
+          name: "Kampas Rem Depan Cakram Honda Matic",
+          brand_id: 1,
+          category_id: 2,
+          motor_compatibility: "Vario 125, Vario 150, Beat FI, Scoopy",
+          cost_price: 25000,
+          selling_price: 40000,
+          stock: 12,
+          min_stock: 3,
+          rack_location: "Rak B-03",
+          unit: "set",
+          is_service: false,
+          is_active: true,
+          brands: { id: 1, name: "Honda" },
+          categories: { id: 2, name: "Pengereman" },
+        },
+        {
+          id: "44444444-4444-4444-4444-444444444444",
+          sku: "CVT-ROLLER-SET",
+          name: "Roller Racing Set 11 Gram Beat / Scoopy",
+          brand_id: 5,
+          category_id: 3,
+          motor_compatibility: "Beat ESP, Scoopy ESP, Vario 110 FI",
+          cost_price: 55000,
+          selling_price: 85000,
+          stock: 8,
+          min_stock: 2,
+          rack_location: "Rak C-01",
+          unit: "set",
+          is_service: false,
+          is_active: true,
+          brands: { id: 5, name: "Universal" },
+          categories: { id: 3, name: "Transmisi & CVT" },
+        },
+        {
+          id: "55555555-5555-5555-5555-555555555555",
+          sku: "JASA-GANTI-OLI",
+          name: "Jasa Ganti Oli Mesin / Gardan",
+          brand_id: 5,
+          category_id: 9,
+          motor_compatibility: "Semua Motor",
+          cost_price: 0,
+          selling_price: 10000,
+          stock: 0,
+          unit: "jasa",
+          is_service: true,
+          is_active: true,
+          brands: { id: 5, name: "Universal" },
+          categories: { id: 9, name: "Jasa & Servis" },
+        },
+        {
+          id: "66666666-6666-6666-6666-666666666666",
+          sku: "JASA-SERVIS-CVT",
+          name: "Jasa Servis CVT & Pembersihan Roller",
+          brand_id: 5,
+          category_id: 9,
+          motor_compatibility: "Semua Matic",
+          cost_price: 0,
+          selling_price: 35000,
+          stock: 0,
+          unit: "jasa",
+          is_service: true,
+          is_active: true,
+          brands: { id: 5, name: "Universal" },
+          categories: { id: 9, name: "Jasa & Servis" },
+        },
+      ];
+
+      const result = supabase.isConfigured ? (await productModel.getAllProducts(filters, offset, limit).catch(() => ({ data: null }))) : null;
+
+      if (result?.data && result.data.length > 0) {
+        return wrapper.response(
+          response,
+          200,
+          "Berhasil mengambil data sparepart",
+          result.data,
+          pagination
+        );
+      }
+
+      // Filter dummy products jika ada pencarian atau filter kategori/merk
+      let filteredDummy = [...dummyProducts];
+      if (filters.brandId) {
+        filteredDummy = filteredDummy.filter((p) => p.brand_id === filters.brandId);
+      }
+      if (filters.categoryId) {
+        filteredDummy = filteredDummy.filter((p) => p.category_id === filters.categoryId);
+      }
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        filteredDummy = filteredDummy.filter((p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q) ||
+          (p.motor_compatibility && p.motor_compatibility.toLowerCase().includes(q))
+        );
+      }
 
       return wrapper.response(
         response,
         200,
-        "Berhasil mengambil data sparepart",
-        result.data,
-        pagination
+        "Data Sparepart (Mode Demo)",
+        filteredDummy,
+        {
+          page: 1,
+          totalPage: 1,
+          limit: 50,
+          totalData: filteredDummy.length,
+        }
       );
     } catch (error) {
       console.error(error);
-      return wrapper.response(response, 500, "Gagal mengambil data sparepart", error);
+      return wrapper.response(response, 200, "Data Sparepart (Mode Demo)", [], { page: 1, totalPage: 1, limit: 50, totalData: 0 });
     }
   },
 

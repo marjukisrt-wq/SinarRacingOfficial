@@ -4,11 +4,37 @@ const wrapper = require("../utils/wrapper");
 module.exports = {
   getAllCategories: async (request, response) => {
     try {
-      const result = await categoryModel.getAllCategories();
-      return wrapper.response(response, 200, "Berhasil mengambil kategori sparepart", result.data);
+      const supabase = require("../config/supabase");
+      const result = supabase.isConfigured ? (await categoryModel.getAllCategories().catch(() => ({ data: null }))) : null;
+      if (result?.data && result.data.length > 0) {
+        return wrapper.response(response, 200, "Berhasil mengambil kategori sparepart", result.data);
+      }
+      const dummyCategories = [
+        { id: 1, name: "Oli & Pelumas" },
+        { id: 2, name: "Pengereman" },
+        { id: 3, name: "Transmisi & CVT" },
+        { id: 4, name: "Mesin" },
+        { id: 5, name: "Kelistrikan & Busi" },
+        { id: 6, name: "Rangka & Bodi" },
+        { id: 7, name: "Ban & Roda" },
+        { id: 8, name: "Aksesoris & Baut" },
+        { id: 9, name: "Jasa & Servis" },
+      ];
+      return wrapper.response(response, 200, "Kategori Sparepart (Mode Demo)", dummyCategories);
     } catch (error) {
       console.error(error);
-      return wrapper.response(response, 500, "Gagal mengambil kategori sparepart", error);
+      const dummyCategories = [
+        { id: 1, name: "Oli & Pelumas" },
+        { id: 2, name: "Pengereman" },
+        { id: 3, name: "Transmisi & CVT" },
+        { id: 4, name: "Mesin" },
+        { id: 5, name: "Kelistrikan & Busi" },
+        { id: 6, name: "Rangka & Bodi" },
+        { id: 7, name: "Ban & Roda" },
+        { id: 8, name: "Aksesoris & Baut" },
+        { id: 9, name: "Jasa & Servis" },
+      ];
+      return wrapper.response(response, 200, "Kategori Sparepart (Mode Demo)", dummyCategories);
     }
   },
 

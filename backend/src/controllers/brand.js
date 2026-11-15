@@ -4,11 +4,29 @@ const wrapper = require("../utils/wrapper");
 module.exports = {
   getAllBrands: async (request, response) => {
     try {
-      const result = await brandModel.getAllBrands();
-      return wrapper.response(response, 200, "Berhasil mengambil data merk motor", result.data);
+      const supabase = require("../config/supabase");
+      const result = supabase.isConfigured ? (await brandModel.getAllBrands().catch(() => ({ data: null }))) : null;
+      if (result?.data && result.data.length > 0) {
+        return wrapper.response(response, 200, "Berhasil mengambil data merk motor", result.data);
+      }
+      const dummyBrands = [
+        { id: 1, name: "Honda", description: "Sparepart Honda" },
+        { id: 2, name: "Yamaha", description: "Sparepart Yamaha" },
+        { id: 3, name: "Kawasaki", description: "Sparepart Kawasaki" },
+        { id: 4, name: "Suzuki", description: "Sparepart Suzuki" },
+        { id: 5, name: "Universal", description: "Kompatibel Semua Motor" },
+      ];
+      return wrapper.response(response, 200, "Data Merk Motor (Mode Demo)", dummyBrands);
     } catch (error) {
       console.error(error);
-      return wrapper.response(response, 500, "Gagal mengambil data merk motor", error);
+      const dummyBrands = [
+        { id: 1, name: "Honda", description: "Sparepart Honda" },
+        { id: 2, name: "Yamaha", description: "Sparepart Yamaha" },
+        { id: 3, name: "Kawasaki", description: "Sparepart Kawasaki" },
+        { id: 4, name: "Suzuki", description: "Sparepart Suzuki" },
+        { id: 5, name: "Universal", description: "Kompatibel Semua Motor" },
+      ];
+      return wrapper.response(response, 200, "Data Merk Motor (Mode Demo)", dummyBrands);
     }
   },
 

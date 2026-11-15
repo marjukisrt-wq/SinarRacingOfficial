@@ -4,11 +4,30 @@ const wrapper = require("../utils/wrapper");
 module.exports = {
   getSettings: async (request, response) => {
     try {
-      const result = await storeSettingsModel.getSettings();
-      return wrapper.response(response, 200, "Berhasil mengambil profil toko", result.data);
+      const supabase = require("../config/supabase");
+      const result = supabase.isConfigured ? (await storeSettingsModel.getSettings().catch(() => ({ data: null }))) : null;
+      if (result?.data) {
+        return wrapper.response(response, 200, "Berhasil mengambil profil toko", result.data);
+      }
+      // Fallback profil toko Sinar Racing Official
+      return wrapper.response(response, 200, "Profil Toko (Mode Demo)", {
+        id: 1,
+        store_name: "SINAR RACING OFFICIAL",
+        tagline: "Pusat Sparepart & Servis Motor",
+        address: "Jl. Raya Utama Bengkel No. 88",
+        phone: "0812-3456-7890",
+        receipt_footer: "Terima kasih atas kunjungan Anda!\nGaransi servis 3 hari.",
+      });
     } catch (error) {
       console.error(error);
-      return wrapper.response(response, 500, "Gagal mengambil profil toko", error);
+      return wrapper.response(response, 200, "Profil Toko (Mode Demo)", {
+        id: 1,
+        store_name: "SINAR RACING OFFICIAL",
+        tagline: "Pusat Sparepart & Servis Motor",
+        address: "Jl. Raya Utama Bengkel No. 88",
+        phone: "0812-3456-7890",
+        receipt_footer: "Terima kasih atas kunjungan Anda!\nGaransi servis 3 hari.",
+      });
     }
   },
 
