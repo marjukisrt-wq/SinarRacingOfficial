@@ -32,7 +32,7 @@ module.exports = {
           name: "Owner Sinar Racing Official",
           role: "SUPER_ADMIN",
         };
-        const token = jwt.sign(dummyPayload, JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign(dummyPayload, JWT_SECRET, { expiresIn: "90d" });
         return wrapper.response(response, 200, "Login berhasil (Mode Demo Lokal)", {
           user: dummyPayload,
           token,
@@ -53,7 +53,7 @@ module.exports = {
         return wrapper.response(response, 400, "Username atau password salah");
       }
 
-      // Buat token JWT (berlaku 7 hari agar kasir tidak sering logout)
+      // Buat token JWT (berlaku 90 hari agar kasir & staf tidak sering logout berulang di HP/PC)
       const payload = {
         id: user.id,
         username: user.username,
@@ -61,7 +61,7 @@ module.exports = {
         role: user.role,
       };
 
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "90d" });
 
       return wrapper.response(response, 200, "Login berhasil", {
         user: payload,
