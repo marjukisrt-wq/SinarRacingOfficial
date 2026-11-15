@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { IoSettingsOutline, IoCheckmarkCircleOutline } from 'react-icons/io5';
+import { BrandLogo } from '../components/BrandLogo';
 
 export const SettingsView = () => {
   const [storeName, setStoreName] = useState('SINAR RACING OFFICIAL');
@@ -112,45 +113,45 @@ export const SettingsView = () => {
           marginBottom: '1.25rem',
         }}>
           <h4 style={{ fontSize: '0.9rem', marginBottom: '0.65rem', color: '#93c5fd' }}>
-            Logo Resmi Sinar Racing Official
+            Branding & Vector Emblem: Sinar Racing Official
           </h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div style={{
               background: '#0b0f19',
-              padding: '0.85rem',
+              padding: '1rem',
               borderRadius: '8px',
               textAlign: 'center',
-              border: '1px solid #1e293b'
+              border: '1px solid #1e293b',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.5rem' }}>
-                Logo Aplikasi (HD Transparan)
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.65rem' }}>
+                Logo Aplikasi (Pure Vector SVG)
               </span>
-              <img 
-                src="/logo.png" 
-                alt="Logo HD" 
-                style={{ maxHeight: '48px', maxWidth: '100%', objectFit: 'contain' }} 
-              />
+              <BrandLogo variant="horizontal" size="sm" />
             </div>
 
             <div style={{
               background: '#ffffff',
-              padding: '0.85rem',
+              padding: '1rem',
               borderRadius: '8px',
               textAlign: 'center',
-              border: '1px solid #cbd5e1'
+              border: '1px solid #cbd5e1',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <span style={{ fontSize: '0.75rem', color: '#475569', display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                Logo Struk Thermal (Monochrome 58mm)
+              <span style={{ fontSize: '0.75rem', color: '#475569', display: 'block', marginBottom: '0.65rem', fontWeight: 600 }}>
+                Emblem Struk Thermal (Monochrome Vector)
               </span>
-              <img 
-                src="/logo-thermal.png" 
-                alt="Logo Struk Thermal" 
-                style={{ maxHeight: '48px', maxWidth: '100%', objectFit: 'contain' }} 
-              />
+              <BrandLogo variant="thermal" size="sm" />
             </div>
           </div>
           <p style={{ fontSize: '0.76rem', color: '#94a3b8', marginTop: '0.65rem' }}>
-            ✓ Logo otomatis dicetak di bagian paling atas struk saat menggunakan printer Bluetooth thermal maupun Cetak Standar.
+            ✓ Vector SVG modern — tajam tanpa pixelate di HP, Tablet, Laptop, dan Struk Thermal.
           </p>
         </div>
 

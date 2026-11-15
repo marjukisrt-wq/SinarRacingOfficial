@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { FaMotorcycle } from 'react-icons/fa6';
 import { IoLogInOutline, IoLockClosedOutline, IoPersonOutline } from 'react-icons/io5';
+import { BrandLogo } from '../components/BrandLogo';
 
 export const LoginView = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState('');
@@ -46,18 +47,7 @@ export const LoginView = ({ onLoginSuccess }) => {
         boxShadow: 'var(--shadow-lg)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <img 
-            src="/logo.png" 
-            alt="Sinar Racing Official" 
-            style={{ 
-              maxHeight: '75px', 
-              maxWidth: '260px', 
-              width: 'auto', 
-              objectFit: 'contain',
-              marginBottom: '0.75rem',
-              filter: 'drop-shadow(0 4px 16px rgba(37, 99, 235, 0.45))'
-            }} 
-          />
+          <BrandLogo variant="vertical" size="lg" style={{ marginBottom: '1rem' }} />
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>POS & Stok Gudang</h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Silakan masuk untuk mengelola kasir & inventaris bengkel

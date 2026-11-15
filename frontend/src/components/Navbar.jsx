@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { BrandLogo } from './BrandLogo';
 import { 
   IoReceiptOutline, 
   IoCubeOutline, 
@@ -23,17 +24,8 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
             onClick={() => setActiveTab(isGudang ? 'inventory' : 'pos')} 
             style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem' }}
           >
-            <img 
-              src="/logo.png" 
-              alt="Sinar Racing Official" 
-              style={{ 
-                height: '36px', 
-                width: 'auto', 
-                objectFit: 'contain',
-                filter: 'drop-shadow(0 2px 8px rgba(37, 99, 235, 0.4))'
-              }} 
-            />
-            <span className="brand-badge">
+            <BrandLogo variant="horizontal" size="sm" showBadge={false} />
+            <span className="brand-badge" style={{ marginLeft: '0.35rem' }}>
               {isSuperAdmin ? 'POS & STOK' : isGudang ? 'STOK GUDANG' : 'KASIR POS'}
             </span>
           </div>

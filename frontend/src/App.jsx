@@ -7,6 +7,7 @@ import { TransactionsView } from './views/TransactionsView';
 import { UserManagementView } from './views/UserManagementView';
 import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
+import { BrandLogo } from './components/BrandLogo';
 
 const MainApp = () => {
   const { user, loading, isSuperAdmin, isKasir, isGudang } = useAuth();
@@ -39,12 +40,8 @@ const MainApp = () => {
         flexDirection: 'column',
         gap: '0.85rem',
       }}>
-        <img 
-          src="/logo.png" 
-          alt="Sinar Racing Official" 
-          style={{ height: '48px', filter: 'drop-shadow(0 4px 14px rgba(37, 99, 235, 0.45))' }} 
-        />
-        <div style={{ color: '#94a3b8', fontSize: '0.82rem', fontFamily: 'var(--font-mono)' }}>
+        <BrandLogo variant="vertical" size="md" />
+        <div style={{ color: '#94a3b8', fontSize: '0.82rem', fontFamily: 'var(--font-mono)', marginTop: '0.5rem' }}>
           Memuat sistem Sinar Racing Official...
         </div>
       </div>

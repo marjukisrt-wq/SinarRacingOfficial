@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrandLogo } from './BrandLogo';
 import { 
   printViaWebBluetooth, 
   formatCurrency, 
@@ -151,17 +152,7 @@ export const ThermalReceipt = ({ transaction, store, onClose }) => {
         {/* PREVIEW STRUK 58mm */}
         <div className="thermal-receipt-preview printable-receipt" id="printable-receipt">
           <div className="receipt-center" style={{ marginBottom: '8px' }}>
-            <img 
-              src="/logo-thermal.png" 
-              alt="Sinar Racing Official" 
-              style={{ 
-                maxWidth: '190px', 
-                width: '85%', 
-                height: 'auto', 
-                display: 'block', 
-                margin: '0 auto 4px auto' 
-              }} 
-            />
+            <BrandLogo variant="thermal" size="sm" />
           </div>
           <div className="receipt-center" style={{ fontSize: '11px', color: '#555', whiteSpace: 'pre-line' }}>
             {wrapEscposText(store?.tagline || 'Pusat Sparepart & Servis Motor', 32)}
