@@ -74,7 +74,7 @@ module.exports = {
       if (!deleted) {
         return wrapper.response(response, 404, "Data mekanik tidak ditemukan");
       }
-      return wrapper.response(response, 200, "Mekanik berhasil dinonaktifkan", deleted);
+      return wrapper.response(response, 200, "Mekanik berhasil dihapus", deleted);
     } catch (error) {
       console.error(error);
       return wrapper.response(response, 500, "Gagal menghapus mekanik", error);

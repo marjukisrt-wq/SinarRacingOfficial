@@ -4,6 +4,15 @@ const supabase = require("../config/supabase");
 
 const LOCAL_FILE = path.resolve(__dirname, "../../data/mechanics.json");
 
+const withTimeout = (promise, ms = 2500) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Supabase request timeout")), ms)
+    ),
+  ]);
+};
+
 const readLocalMechanics = () => {
   try {
     if (!fs.existsSync(LOCAL_FILE)) {
@@ -27,18 +36,18 @@ const writeLocalMechanics = (data) => {
 
 module.exports = {
   getAllMechanics: async (includeInactive = false) => {
-    // 1. Coba dari Supabase jika tersedia
+    // 1. Coba dari Supabase jika tersedia (maks 2.5 detik)
     try {
       let query = supabase.from("mechanics").select("*").order("name", { ascending: true });
       if (!includeInactive) {
         query = query.eq("is_active", true);
       }
-      const { data, error } = await query;
-      if (!error && data) {
+      const { data, error } = await withTimeout(query, 2000);
+      if (!error && data && data.length > 0) {
         return data;
       }
     } catch (e) {
-      // Abaikan jika tabel belum dibuat di Supabase
+      // Abaikan jika tabel belum ada atau timeout offline
     }
 
     // 2. Fallback local JSON file
@@ -51,7 +60,10 @@ module.exports = {
 
   getMechanicById: async (id) => {
     try {
-      const { data, error } = await supabase.from("mechanics").select("*").eq("id", id).single();
+      const { data, error } = await withTimeout(
+        supabase.from("mechanics").select("*").eq("id", id).single(),
+        2000
+      );
       if (!error && data) return data;
     } catch (e) {}
 
@@ -62,17 +74,24 @@ module.exports = {
   createMechanic: async (mechanicData) => {
     // 1. Coba simpan ke Supabase
     try {
-      const { data, error } = await supabase
-        .from("mechanics")
-        .insert([{
-          name: mechanicData.name,
-          phone: mechanicData.phone || "",
-          commission_rate: mechanicData.commission_rate || 50,
-          is_active: true,
-        }])
-        .select()
-        .single();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("mechanics")
+          .insert([{
+            name: mechanicData.name,
+            phone: mechanicData.phone || "",
+            commission_rate: Number(mechanicData.commission_rate) || 50,
+            is_active: true,
+          }])
+          .select()
+          .single(),
+        2500
+      );
       if (!error && data) {
+        // Sinkronisasi ke local backup file
+        const list = readLocalMechanics();
+        list.push(data);
+        writeLocalMechanics(list);
         return data;
       }
     } catch (e) {}
@@ -94,18 +113,30 @@ module.exports = {
   },
 
   updateMechanic: async (id, updateData) => {
+    // 1. Coba perbarui di Supabase
     try {
-      const { data, error } = await supabase
-        .from("mechanics")
-        .update(updateData)
-        .eq("id", id)
-        .select()
-        .single();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("mechanics")
+          .update(updateData)
+          .eq("id", id)
+          .select()
+          .single(),
+        2500
+      );
       if (!error && data) {
+        // Sinkronisasi ke local file
+        const list = readLocalMechanics();
+        const index = list.findIndex((m) => String(m.id) === String(id));
+        if (index !== -1) {
+          list[index] = { ...list[index], ...updateData, updated_at: new Date().toISOString() };
+          writeLocalMechanics(list);
+        }
         return data;
       }
     } catch (e) {}
 
+    // 2. Fallback local file
     const list = readLocalMechanics();
     const index = list.findIndex((m) => String(m.id) === String(id));
     if (index !== -1) {
@@ -117,31 +148,39 @@ module.exports = {
   },
 
   deleteMechanic: async (id) => {
+    // 1. Coba hapus permanen dari Supabase
+    let deletedSupabase = null;
     try {
-      const { data, error } = await supabase
-        .from("mechanics")
-        .update({ is_active: false })
-        .eq("id", id)
-        .select()
-        .single();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("mechanics")
+          .delete()
+          .eq("id", id)
+          .select()
+          .single(),
+        2500
+      );
       if (!error && data) {
-        return data;
+        deletedSupabase = data;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Gagal delete mekanik di Supabase:", e?.message);
+    }
 
+    // 2. Selalu bersihkan juga dari local JSON file
     const list = readLocalMechanics();
     const index = list.findIndex((m) => String(m.id) === String(id));
     if (index !== -1) {
-      list[index].is_active = false;
+      const removed = list.splice(index, 1);
       writeLocalMechanics(list);
-      return list[index];
+      return deletedSupabase || removed[0];
     }
-    return null;
+
+    return deletedSupabase;
   },
 
   // Rekap Jasa Bulanan per Mekanik
   getMonthlyRecap: async (yearMonth) => {
-    // yearMonth format: "YYYY-MM" (contoh: "2026-11")
     let target = yearMonth;
     if (!target) {
       const now = new Date();
@@ -149,37 +188,38 @@ module.exports = {
     }
 
     const startDate = `${target}-01T00:00:00.000Z`;
-    // Ambil tanggal akhir bulan
     const [y, m] = target.split("-").map(Number);
     const lastDay = new Date(y, m, 0).getDate();
     const endDate = `${target}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`;
 
-    // Ambil semua transaksi yang COMPLETED
+    // Ambil transaksi COMPLETED
     let transactions = [];
     try {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(`
-          id, invoice_number, created_at, customer_name, vehicle_plate, vehicle_model,
-          items:transaction_items (*)
-        `)
-        .neq("status", "DRAFT")
-        .gte("created_at", startDate)
-        .lte("created_at", endDate)
-        .order("created_at", { ascending: true });
+      const { data, error } = await withTimeout(
+        supabase
+          .from("transactions")
+          .select(`
+            id, invoice_number, created_at, customer_name, vehicle_plate, vehicle_model,
+            items:transaction_items (*)
+          `)
+          .neq("status", "DRAFT")
+          .gte("created_at", startDate)
+          .lte("created_at", endDate)
+          .order("created_at", { ascending: true }),
+        3500
+      );
 
       if (!error && data) {
         transactions = data;
       }
     } catch (e) {
-      console.error("Gagal mengambil transaksi untuk rekap mekanik:", e);
+      console.warn("Gagal mengambil transaksi Supabase untuk rekap mekanik:", e?.message);
     }
 
     // Ambil daftar mekanik untuk base rate & daftar nama
     let mechanicsList = [];
     try {
-      let query = supabase.from("mechanics").select("*");
-      const { data } = await query;
+      const { data } = await withTimeout(supabase.from("mechanics").select("*"), 2000);
       if (data && data.length > 0) mechanicsList = data;
       else mechanicsList = readLocalMechanics();
     } catch (e) {
@@ -187,7 +227,6 @@ module.exports = {
     }
 
     const mechanicMap = {};
-    // Daftarkan semua mekanik aktif
     for (const m of mechanicsList) {
       mechanicMap[m.name.toLowerCase().trim()] = {
         id: m.id,
@@ -217,18 +256,16 @@ module.exports = {
     let totalWorkshopServiceOmset = 0;
     let totalWorkshopServiceCount = 0;
 
-    // Loop semua item transaksi
     for (const trx of transactions) {
       if (!trx.items || !Array.isArray(trx.items)) continue;
 
       for (const item of trx.items) {
-        if (!item.is_service) continue; // Hanya hitung JASA SERVIS
+        if (!item.is_service) continue;
 
         const servicePrice = Number(item.subtotal || item.unit_price * item.quantity || 0);
         totalWorkshopServiceOmset += servicePrice;
         totalWorkshopServiceCount += Number(item.quantity || 1);
 
-        // Cari mekanik yang menangani
         let mechName = (item.mechanic_name || "").trim();
         let key = mechName ? mechName.toLowerCase() : unassignedKey;
 
@@ -267,7 +304,6 @@ module.exports = {
       }
     }
 
-    // Ubah map jadi array dan urutkan berdasarkan omset tertinggi
     const recapList = Object.values(mechanicMap)
       .filter((m) => m.total_services > 0 || (m.name !== "Umum / Belum Dipilih"))
       .sort((a, b) => b.total_revenue - a.total_revenue);

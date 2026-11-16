@@ -114,9 +114,23 @@ export const MechanicsView = () => {
     }
   };
 
+  const handleDeleteMechanic = async (mechanic) => {
+    if (!window.confirm(`Yakin ingin menghapus mekanik "${mechanic.name}" dari sistem bengkel? Tindakan ini akan menghapus data mekanik secara permanen.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/mechanics/${mechanic.id}`);
+      fetchMechanics();
+      fetchRecap(selectedMonth);
+    } catch (e) {
+      alert(e.response?.data?.message || 'Gagal menghapus data mekanik');
+    }
+  };
+
   const handleToggleActive = async (mechanic) => {
     const confirmText = mechanic.is_active
-      ? `Nonaktifkan mekanik "${mechanic.name}"?`
+      ? `Nonaktifkan mekanik "${mechanic.name}"? (Mekanik tidak akan muncul di pilihan kasir)`
       : `Aktifkan kembali mekanik "${mechanic.name}"?`;
 
     if (!window.confirm(confirmText)) return;
@@ -489,16 +503,27 @@ export const MechanicsView = () => {
                       </span>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                      <span style={{
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '999px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        background: m.is_active ? 'rgba(74, 222, 128, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: m.is_active ? '#4ade80' : '#f87171',
-                      }}>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(m)}
+                        style={{
+                          cursor: 'pointer',
+                          border: 'none',
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '999px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: m.is_active ? 'rgba(74, 222, 128, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: m.is_active ? '#4ade80' : '#f87171',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                        title={m.is_active ? 'Klik untuk menonaktifkan status kerja' : 'Klik untuk mengaktifkan kembali'}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: m.is_active ? '#4ade80' : '#f87171' }} />
                         {m.is_active ? 'Aktif' : 'Nonaktif'}
-                      </span>
+                      </button>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
@@ -517,17 +542,17 @@ export const MechanicsView = () => {
                             justifyContent: 'center',
                             cursor: 'pointer',
                           }}
-                          title="Edit Mekanik"
+                          title="Edit Data Mekanik"
                         >
                           <IoPencilOutline size={15} />
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleToggleActive(m)}
+                          onClick={() => handleDeleteMechanic(m)}
                           style={{
-                            background: '#1e293b',
-                            border: '1px solid #334155',
-                            color: m.is_active ? '#f87171' : '#4ade80',
+                            background: 'rgba(239, 68, 68, 0.12)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#f87171',
                             borderRadius: '6px',
                             width: '28px',
                             height: '28px',
@@ -536,7 +561,7 @@ export const MechanicsView = () => {
                             justifyContent: 'center',
                             cursor: 'pointer',
                           }}
-                          title={m.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                          title="Hapus Mekanik Permanen"
                         >
                           <IoTrashOutline size={15} />
                         </button>
