@@ -959,7 +959,8 @@ input[type="number"] {
   body * {
     visibility: hidden;
   }
-  .printable-receipt, .printable-receipt * {
+  .printable-receipt, .printable-receipt *,
+  #printable-barcode-label, #printable-barcode-label * {
     visibility: visible;
   }
   .printable-receipt {
@@ -974,6 +975,19 @@ input[type="number"] {
     color: #000000 !important;
     font-size: 11px !important;
     font-family: 'Courier New', Courier, monospace !important;
+  }
+  #printable-barcode-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 50mm !important;
+    max-width: 50mm !important;
+    padding: 1.5mm 2mm !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 }
 

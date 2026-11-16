@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { formatCurrency, formatNumber } from '../utils/bluetoothPrinter';
 import { useAuth } from '../context/AuthContext';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { BarcodeLabelModal } from './BarcodeLabelModal';
 import { 
   IoCloseCircleOutline, 
   IoCloudUploadOutline, 
@@ -9,7 +11,10 @@ import {
   IoConstructOutline,
   IoCubeOutline,
   IoTrashOutline,
-  IoImageOutline
+  IoImageOutline,
+  IoBarcodeOutline,
+  IoPrintOutline,
+  IoCameraOutline
 } from 'react-icons/io5';
 
 // Format angka menjadi format ribuan Rupiah (contoh: 10000 -> "10.000")
@@ -46,6 +51,10 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Modal Scanner Barcode Kemasan & Cetak Label
+  const [showScanBarcodeModal, setShowScanBarcodeModal] = useState(false);
+  const [showPrintLabelModal, setShowPrintLabelModal] = useState(false);
 
   // Sinkronisasi state setiap kali productToEdit berubah (Mode Edit vs Tambah)
   useEffect(() => {
@@ -305,17 +314,42 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>Kode Barcode / SKU Part</span>
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Dapat di-scan dengan HP / Barcode Gun</span>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Bisa foto kemasan atau buat otomatis</span>
               </label>
-              <div style={{ display: 'flex', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Contoh: AHM-06455-KVB-T01 atau SRM-89412"
+                  placeholder="Ketik kode part, atau klik Foto/Scan Barcode..."
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
-                  style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
+                  style={{ flex: 1, minWidth: '180px', fontFamily: 'var(--font-mono)' }}
                 />
+
+                {/* Tombol Foto / Scan Barcode dari Kemasan */}
+                <button
+                  type="button"
+                  onClick={() => setShowScanBarcodeModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0 0.85rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Foto atau scan langsung barcode kemasan part menggunakan kamera HP/laptop"
+                >
+                  <IoCameraOutline size={16} /> Foto/Scan Barcode
+                </button>
+
+                {/* Tombol Generate Barcode Toko */}
                 <button
                   type="button"
                   onClick={() => {
@@ -328,16 +362,54 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
                     border: '1px solid #334155',
                     borderRadius: '8px',
                     padding: '0 0.75rem',
-                    fontSize: '0.75rem',
+                    fontSize: '0.78rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                   }}
-                  title="Generate kode barcode acak otomatis"
+                  title="Generate kode barcode acak unik otomatis"
                 >
                   🎲 Buat Barcode
                 </button>
               </div>
+
+              {/* Opsi Cetak Stiker Label jika barcode sudah ada */}
+              {sku && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'rgba(250, 204, 21, 0.08)',
+                  border: '1px dashed rgba(250, 204, 21, 0.35)',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                }}>
+                  <span style={{ fontSize: '0.75rem', color: '#facc15' }}>
+                    Barcode siap: <strong>{sku}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintLabelModal(true)}
+                    style={{
+                      background: '#facc15',
+                      color: '#0f172a',
+                      border: 'none',
+                      borderRadius: '5px',
+                      padding: '4px 10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                    title="Cetak stiker label barcode ukuran thermal 50x30 mm sekarang"
+                  >
+                    <IoPrintOutline size={14} /> Cetak Stiker Label (50x30 mm)
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -653,6 +725,31 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
           </div>
         </form>
       </div>
+
+      {/* Modal Scanner / Foto Barcode dari Kemasan Part */}
+      <BarcodeScannerModal
+        isOpen={showScanBarcodeModal}
+        onClose={() => setShowScanBarcodeModal(false)}
+        mode="CAPTURE_CODE"
+        onCaptureCode={(capturedCode) => {
+          setSku(capturedCode);
+          setShowScanBarcodeModal(false);
+        }}
+      />
+
+      {/* Modal Cetak Stiker Label Barcode Thermal Langsung dari Form */}
+      <BarcodeLabelModal
+        isOpen={showPrintLabelModal}
+        onClose={() => setShowPrintLabelModal(false)}
+        product={{
+          name: name || 'Sparepart Motor',
+          sku: sku,
+          selling_price: sellingPrice || 0,
+          brand: brands?.find((b) => String(b.id) === String(brandId)) || { name: 'Sinar Racing' },
+          motor_compatibility: motorCompatibility,
+          rack_location: rackLocation,
+        }}
+      />
     </div>
   );
 };

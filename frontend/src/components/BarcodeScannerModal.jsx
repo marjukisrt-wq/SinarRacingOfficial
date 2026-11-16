@@ -34,9 +34,10 @@ const playBeep = () => {
 export const BarcodeScannerModal = ({
   isOpen,
   onClose,
-  mode = 'CHECK_PRICE', // 'CHECK_PRICE' atau 'ADD_TO_CART'
+  mode = 'CHECK_PRICE', // 'CHECK_PRICE', 'ADD_TO_CART', atau 'CAPTURE_CODE'
   products = [],
   onAddToCart,
+  onCaptureCode,
 }) => {
   const [manualBarcode, setManualBarcode] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
@@ -44,6 +45,7 @@ export const BarcodeScannerModal = ({
   const [torchOn, setTorchOn] = useState(false);
   const [scannedResult, setScannedResult] = useState(null);
   const [notFoundBarcode, setNotFoundBarcode] = useState(null);
+  const fileInputRef = useRef(null);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -67,6 +69,16 @@ export const BarcodeScannerModal = ({
     scanningRef.current = true;
     playBeep();
 
+    // Mode Khusus: Mengisi Kode Barcode / SKU saat Input Stok
+    if (mode === 'CAPTURE_CODE') {
+      if (onCaptureCode) {
+        onCaptureCode(barcodeText);
+      }
+      onClose();
+      scanningRef.current = false;
+      return;
+    }
+
     const product = lookupProduct(barcodeText);
 
     if (product) {
@@ -86,6 +98,40 @@ export const BarcodeScannerModal = ({
     setTimeout(() => {
       scanningRef.current = false;
     }, 1200);
+  };
+
+  // Deteksi Barcode dari Foto / Gambar Kemasan
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      if (!('BarcodeDetector' in window)) {
+        alert('Fitur deteksi barcode dari foto memerlukan browser modern (Chrome/Edge/Safari terbaru). Gunakan kamera live atau input manual jika belum didukung.');
+        return;
+      }
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = async () => {
+        try {
+          const detector = new window.BarcodeDetector({
+            formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e'],
+          });
+          const barcodes = await detector.detect(img);
+          if (barcodes.length > 0 && barcodes[0].rawValue) {
+            handleBarcodeFound(barcodes[0].rawValue);
+          } else {
+            alert('Tidak ada barcode yang terdeteksi pada foto ini. Pastikan foto tegak lurus, garis-garis barcode jelas, dan pencahayaan terang.');
+          }
+        } catch (err) {
+          console.error('Gagal deteksi foto:', err);
+          alert('Gagal mendeteksi barcode dari foto: ' + err.message);
+        }
+      };
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Inisialisasi Kamera & Barcode Detector dengan fallback bertahap
@@ -290,10 +336,10 @@ export const BarcodeScannerModal = ({
             </div>
             <div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-                {mode === 'CHECK_PRICE' ? 'Cek Harga Sparepart' : 'Scan Barcode ke Kasir'}
+                {mode === 'CAPTURE_CODE' ? 'Foto / Scan Barcode Kemasan' : (mode === 'CHECK_PRICE' ? 'Cek Harga Sparepart' : 'Scan Barcode ke Kasir')}
               </h3>
               <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>
-                {mode === 'CHECK_PRICE' ? 'Arahkan kamera ke barcode part motor' : 'Scan barang untuk langsung masuk keranjang kasir'}
+                {mode === 'CAPTURE_CODE' ? 'Arahkan kamera atau unggah foto barcode dari bungkus part' : (mode === 'CHECK_PRICE' ? 'Arahkan kamera ke barcode part motor' : 'Scan barang untuk langsung masuk keranjang kasir')}
               </p>
             </div>
           </div>
@@ -443,6 +489,36 @@ export const BarcodeScannerModal = ({
             >
               Cek
             </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                background: '#1e293b',
+                color: '#38bdf8',
+                border: '1px solid #334155',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                whiteSpace: 'nowrap',
+              }}
+              title="Ambil foto atau pilih gambar barcode dari galeri HP/PC"
+            >
+              📷 Foto/Galeri
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoUpload}
+              style={{ display: 'none' }}
+            />
           </form>
 
           {products && products.length > 0 && (
