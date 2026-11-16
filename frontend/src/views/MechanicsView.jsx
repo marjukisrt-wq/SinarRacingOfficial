@@ -13,7 +13,24 @@ import {
   IoCloseOutline,
   IoEyeOutline,
   IoDocumentTextOutline,
+  IoAddCircleOutline,
+  IoWalletOutline,
+  IoConstructOutline,
+  IoReceiptOutline,
 } from 'react-icons/io5';
+
+// Format angka menjadi format ribuan Rupiah
+const formatRupiahInput = (val) => {
+  if (val === undefined || val === null || val === '') return '';
+  const cleanNumber = String(val).replace(/\D/g, '');
+  if (!cleanNumber) return '';
+  return new Intl.NumberFormat('id-ID').format(cleanNumber);
+};
+
+const parseRupiahInput = (val) => {
+  const cleanNumber = String(val).replace(/\D/g, '');
+  return cleanNumber ? Number(cleanNumber) : 0;
+};
 
 export const MechanicsView = () => {
   const [activeSubTab, setActiveSubTab] = useState('recap'); // 'recap' atau 'manage'
@@ -39,6 +56,21 @@ export const MechanicsView = () => {
 
   // Modal Detail Rincian Pekerjaan Mekanik
   const [selectedMechanicJobs, setSelectedMechanicJobs] = useState(null);
+
+  // Modal Input Jasa Manual Langsung
+  const [showManualJobModal, setShowManualJobModal] = useState(false);
+  const [manualJobLoading, setManualJobLoading] = useState(false);
+  const [manualJobError, setManualJobError] = useState(null);
+  const [manualJobForm, setManualJobForm] = useState({
+    mechanic_name: '',
+    is_custom_mechanic: false,
+    service_name: '',
+    vehicle_plate: '',
+    vehicle_model: '',
+    price: 0,
+    date: new Date().toISOString().slice(0, 10),
+    notes: '',
+  });
 
   // Ambil data mekanik
   const fetchMechanics = async () => {
@@ -146,6 +178,190 @@ export const MechanicsView = () => {
 
   const handlePrintRecap = () => {
     window.print();
+  };
+
+  const handleOpenManualJobModal = (presetMechanicName = '') => {
+    setManualJobError(null);
+    const defaultMech = presetMechanicName || (mechanics.find(m => m.is_active)?.name || '');
+    setManualJobForm({
+      mechanic_name: defaultMech,
+      is_custom_mechanic: !defaultMech,
+      service_name: '',
+      vehicle_plate: '',
+      vehicle_model: '',
+      price: 0,
+      date: new Date().toISOString().slice(0, 10),
+      notes: '',
+    });
+    setShowManualJobModal(true);
+  };
+
+  const handleSubmitManualJob = async (e) => {
+    e.preventDefault();
+    if (!manualJobForm.service_name.trim()) {
+      setManualJobError('Nama pekerjaan / jasa servis wajib diisi');
+      return;
+    }
+    const numPrice = Number(manualJobForm.price) || 0;
+    if (numPrice <= 0) {
+      setManualJobError('Tarif jasa harus lebih dari Rp 0');
+      return;
+    }
+    if (!manualJobForm.mechanic_name.trim()) {
+      setManualJobError('Nama mekanik wajib diisi atau dipilih');
+      return;
+    }
+
+    try {
+      setManualJobLoading(true);
+      setManualJobError(null);
+      await api.post('/mechanics/manual-job', {
+        mechanic_name: manualJobForm.mechanic_name.trim(),
+        service_name: manualJobForm.service_name.trim(),
+        vehicle_plate: manualJobForm.vehicle_plate.trim().toUpperCase(),
+        vehicle_model: manualJobForm.vehicle_model.trim(),
+        price: numPrice,
+        date: manualJobForm.date,
+        notes: manualJobForm.notes.trim(),
+      });
+      setShowManualJobModal(false);
+      fetchRecap(selectedMonth);
+      fetchMechanics();
+      alert('Pekerjaan jasa mekanik berhasil dicatat & disinkronkan ke Rekap Mekanik!');
+    } catch (err) {
+      setManualJobError(err.response?.data?.message || 'Gagal menyimpan pekerjaan jasa manual');
+    } finally {
+      setManualJobLoading(false);
+    }
+  };
+
+  const handleDeleteManualJob = async (jobId) => {
+    if (!window.confirm('Yakin ingin menghapus entri pekerjaan manual ini? Data transaksi terkait juga akan dihapus.')) return;
+    try {
+      await api.delete(`/mechanics/manual-job/${jobId}`);
+      if (selectedMechanicJobs) {
+        setSelectedMechanicJobs(prev => ({
+          ...prev,
+          jobs: prev.jobs.filter(j => j.id !== jobId)
+        }));
+      }
+      fetchRecap(selectedMonth);
+    } catch (e) {
+      alert('Gagal menghapus entri jasa manual');
+    }
+  };
+
+  // Cetak Slip Gaji Resmi Mekanik
+  const handlePrintSlip = (m) => {
+    const printWindow = window.open('', '_blank', 'width=750,height=850');
+    if (!printWindow) {
+      alert('Popup diblokir oleh browser. Izinkan popup untuk mencetak slip komisi mekanik.');
+      return;
+    }
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Slip Komisi Jasa Mekanik - ${m.name}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 30px; color: #1e293b; font-size: 13px; line-height: 1.5; }
+          .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 18px; }
+          .header h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #0f172a; }
+          .header p { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+          .meta { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 12px; background: #f8fafc; padding: 12px 14px; border-radius: 6px; border: 1px solid #e2e8f0; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #f1f5f9; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; color: #475569; border-bottom: 2px solid #cbd5e1; }
+          td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+          .total-box { margin-top: 15px; padding: 14px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; }
+          .total-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+          .total-highlight { font-size: 16px; font-weight: 800; color: #15803d; border-top: 2px dashed #cbd5e1; padding-top: 10px; margin-top: 8px; }
+          .signatures { display: flex; justify-content: space-between; margin-top: 55px; text-align: center; }
+          .sig-box { width: 200px; }
+          .sig-line { border-bottom: 1px solid #0f172a; margin-top: 60px; margin-bottom: 5px; }
+          @media print {
+            body { padding: 15px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>SINAR RACING OFFICIAL</h2>
+          <p>Bengkel Motor & Sparepart • Rekapitulasi Pembagian Hasil Jasa Mekanik</p>
+        </div>
+        <div class="meta">
+          <div>
+            <div><strong>Nama Mekanik:</strong> ${m.name}</div>
+            <div><strong>No Kontak:</strong> ${m.phone || '-'}</div>
+            <div><strong>Rate Komisi:</strong> ${m.commission_rate || 50}%</div>
+          </div>
+          <div style="text-align: right;">
+            <div><strong>Periode:</strong> Bulan ${recapData?.period || selectedMonth}</div>
+            <div><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+            <div><strong>Total Pekerjaan:</strong> ${m.jobs?.length || 0} Unit / Jasa</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 30px;">No</th>
+              <th>No Nota</th>
+              <th>Tanggal</th>
+              <th>Motor / Plat</th>
+              <th>Pekerjaan Jasa</th>
+              <th style="text-align: right;">Tarif Jasa (Rp)</th>
+              <th style="text-align: right;">Hak Mekanik (Rp)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(m.jobs || []).map((j, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td style="font-family: monospace; font-weight: 600;">${j.invoice_number}</td>
+                <td>${new Date(j.date).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</td>
+                <td>${j.vehicle_plate !== '-' ? j.vehicle_plate : ''} ${j.vehicle_model !== '-' ? `(${j.vehicle_model})` : ''}</td>
+                <td style="font-weight: 600;">${j.service_name}</td>
+                <td style="text-align: right; font-family: monospace;">Rp ${Number(j.subtotal || j.price).toLocaleString('id-ID')}</td>
+                <td style="text-align: right; font-weight: bold; color: #15803d; font-family: monospace;">Rp ${Number(j.commission).toLocaleString('id-ID')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="total-box">
+          <div class="total-row">
+            <span>Total Nilai Jasa Pelanggan:</span>
+            <span style="font-family: monospace; font-weight: 600;">Rp ${Number(m.total_revenue).toLocaleString('id-ID')}</span>
+          </div>
+          <div class="total-row">
+            <span>Bagian Laba Bersih Bengkel:</span>
+            <span style="font-family: monospace; font-weight: 600;">Rp ${Number(m.total_workshop_share || (m.total_revenue - m.total_commission)).toLocaleString('id-ID')}</span>
+          </div>
+          <div class="total-row total-highlight">
+            <span>TOTAL KOMISI BERSIH DIBAYARKAN KE MEKANIK:</span>
+            <span style="font-family: monospace;">Rp ${Number(m.total_commission).toLocaleString('id-ID')}</span>
+          </div>
+        </div>
+        <div class="signatures">
+          <div class="sig-box">
+            <span>Penerima (Mekanik)</span>
+            <div class="sig-line"></div>
+            <strong>(${m.name})</strong>
+          </div>
+          <div class="sig-box">
+            <span>Kasir / Pemilik Bengkel</span>
+            <div class="sig-line"></div>
+            <strong>(Sinar Racing Official)</strong>
+          </div>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   return (
@@ -264,25 +480,48 @@ export const MechanicsView = () => {
               />
             </div>
 
-            <button
-              type="button"
-              onClick={handlePrintRecap}
-              style={{
-                background: '#1e293b',
-                color: '#f8fafc',
-                border: '1px solid #334155',
-                padding: '0.55rem 1rem',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                cursor: 'pointer',
-              }}
-            >
-              <IoPrintOutline size={18} /> Cetak Rekap Laporan
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => handleOpenManualJobModal()}
+                style={{
+                  background: 'linear-gradient(135deg, #9333ea, #7e22ce)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '0.55rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(147, 51, 234, 0.35)',
+                }}
+              >
+                <IoAddCircleOutline size={18} /> + Input Jasa Manual Mekanik
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrintRecap}
+                style={{
+                  background: '#1e293b',
+                  color: '#f8fafc',
+                  border: '1px solid #334155',
+                  padding: '0.55rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <IoPrintOutline size={18} /> Cetak Rekap Laporan
+              </button>
+            </div>
           </div>
 
           {/* Kartu Ringkasan Omset Jasa */}
@@ -294,8 +533,8 @@ export const MechanicsView = () => {
               marginBottom: '1.5rem',
             }}>
               <div style={{
-                background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.15), rgba(15, 23, 42, 0.9))',
-                border: '1px solid rgba(220, 38, 38, 0.35)',
+                background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(15, 23, 42, 0.9))',
+                border: '1px solid rgba(234, 179, 8, 0.35)',
                 borderRadius: '12px',
                 padding: '1.15rem',
               }}>
@@ -303,33 +542,33 @@ export const MechanicsView = () => {
                 <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#facc15', margin: '0.35rem 0 0 0', fontFamily: 'var(--font-mono)' }}>
                   Rp {Number(recapData.total_workshop_service_omset || 0).toLocaleString('id-ID')}
                 </div>
-                <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>Bulan {recapData.period}</span>
+                <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>Total bruto dibayar pelanggan ({recapData.total_workshop_service_count || 0} pekerjaan)</span>
               </div>
 
               <div style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-color)',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(15, 23, 42, 0.9))',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
                 borderRadius: '12px',
                 padding: '1.15rem',
               }}>
-                <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>Total Pekerjaan Servis</span>
-                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f8fafc', margin: '0.35rem 0 0 0', fontFamily: 'var(--font-mono)' }}>
-                  {recapData.total_workshop_service_count || 0} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>Unit/Jasa</span>
-                </div>
-                <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>Selesai dikerjakan</span>
-              </div>
-
-              <div style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '12px',
-                padding: '1.15rem',
-              }}>
-                <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>Total Komisi Mekanik</span>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>Total Hak Komisi Mekanik</span>
                 <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#38bdf8', margin: '0.35rem 0 0 0', fontFamily: 'var(--font-mono)' }}>
-                  Rp {Number(recapData.mechanics?.reduce((acc, m) => acc + (m.total_commission || 0), 0) || 0).toLocaleString('id-ID')}
+                  Rp {Number(recapData.total_mechanic_commission || recapData.mechanics?.reduce((acc, m) => acc + (m.total_commission || 0), 0) || 0).toLocaleString('id-ID')}
                 </div>
-                <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>Hak bagi hasil staf mekanik</span>
+                <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>Hak bagi hasil yang dibayarkan ke staf mekanik</span>
+              </div>
+
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(15, 23, 42, 0.9))',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.15rem',
+              }}>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>Laba Bersih Bengkel dari Jasa</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4ade80', margin: '0.35rem 0 0 0', fontFamily: 'var(--font-mono)' }}>
+                  Rp {Number(recapData.total_workshop_service_profit !== undefined ? recapData.total_workshop_service_profit : ((recapData.total_workshop_service_omset || 0) - (recapData.total_mechanic_commission || 0))).toLocaleString('id-ID')}
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>Keuntungan murni masuk ke kas bengkel</span>
               </div>
             </div>
           )}
@@ -346,7 +585,7 @@ export const MechanicsView = () => {
                 Rincian Perolehan Jasa per Mekanik
               </h3>
               <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                Otomatis dihitung dari nota transaksi kasir
+                Otomatis dihitung dari nota transaksi kasir & input manual
               </span>
             </div>
 
@@ -369,6 +608,7 @@ export const MechanicsView = () => {
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Jml Pekerjaan</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Total Jasa (Rp)</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Hak Komisi (Rp)</th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Laba Bengkel (Rp)</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Aksi</th>
                     </tr>
                   </thead>
@@ -402,30 +642,75 @@ export const MechanicsView = () => {
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 800, color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
                           Rp {Number(m.total_commission).toLocaleString('id-ID')}
                         </td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                          Rp {Number(m.total_workshop_share || (m.total_revenue - m.total_commission)).toLocaleString('id-ID')}
+                        </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                          {m.jobs && m.jobs.length > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedMechanicJobs(m)}
-                              style={{
-                                background: '#1e293b',
-                                border: '1px solid #334155',
-                                color: '#f8fafc',
-                                padding: '0.35rem 0.75rem',
-                                borderRadius: '6px',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <IoEyeOutline size={14} /> Detail ({m.jobs.length})
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>-</span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                            {m.jobs && m.jobs.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMechanicJobs(m)}
+                                style={{
+                                  background: '#1e293b',
+                                  border: '1px solid #334155',
+                                  color: '#f8fafc',
+                                  padding: '0.35rem 0.65rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <IoEyeOutline size={14} /> Detail ({m.jobs.length})
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenManualJobModal(m.name)}
+                                style={{
+                                  background: '#1e293b',
+                                  border: '1px solid #334155',
+                                  color: '#9333ea',
+                                  padding: '0.35rem 0.65rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                + Input Jasa
+                              </button>
+                            )}
+                            {m.jobs && m.jobs.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handlePrintSlip(m)}
+                                style={{
+                                  background: 'rgba(56, 189, 248, 0.15)',
+                                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                                  color: '#38bdf8',
+                                  padding: '0.35rem 0.65rem',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  cursor: 'pointer',
+                                }}
+                                title="Cetak Slip Gaji & Rekap Komisi Mekanik"
+                              >
+                                <IoPrintOutline size={14} /> Slip Gaji
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -754,7 +1039,8 @@ export const MechanicsView = () => {
                     <th style={{ padding: '0.5rem' }}>Motor / Plat</th>
                     <th style={{ padding: '0.5rem' }}>Jasa Servis</th>
                     <th style={{ padding: '0.5rem', textAlign: 'right' }}>Tarif</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Komisi ({selectedMechanicJobs.commission_rate}%)</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Hak Mekanik</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'center' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -764,7 +1050,7 @@ export const MechanicsView = () => {
                         {j.invoice_number}
                       </td>
                       <td style={{ padding: '0.5rem', color: '#cbd5e1' }}>
-                        {j.vehicle_model} ({j.vehicle_plate})
+                        {j.vehicle_plate !== '-' ? j.vehicle_plate : ''} {j.vehicle_model !== '-' ? `(${j.vehicle_model})` : ''}
                       </td>
                       <td style={{ padding: '0.5rem', fontWeight: 600, color: '#f8fafc' }}>
                         {j.service_name}
@@ -774,6 +1060,26 @@ export const MechanicsView = () => {
                       </td>
                       <td style={{ padding: '0.5rem', textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#4ade80', fontWeight: 700 }}>
                         Rp {Number(j.commission).toLocaleString('id-ID')}
+                      </td>
+                      <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                        {j.invoice_number?.startsWith('MAN-') && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteManualJob(j.id)}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#f87171',
+                              borderRadius: '4px',
+                              padding: '2px 5px',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer'
+                            }}
+                            title="Hapus entri jasa manual ini"
+                          >
+                            <IoTrashOutline size={12} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -788,23 +1094,295 @@ export const MechanicsView = () => {
                   Rp {Number(selectedMechanicJobs.total_commission).toLocaleString('id-ID')}
                 </div>
               </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => handlePrintSlip(selectedMechanicJobs)}
+                  style={{
+                    background: '#0284c7',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  <IoPrintOutline size={15} /> Cetak Slip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMechanicJobs(null)}
+                  style={{
+                    background: '#1e293b',
+                    color: '#f8fafc',
+                    border: '1px solid #334155',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL INPUT JASA MANUAL MEKANIK */}
+      {showManualJobModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(5, 8, 15, 0.85)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: '#0f172a',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '1.5rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'linear-gradient(135deg, #9333ea, #7e22ce)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  <IoConstructOutline size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+                    Input Jasa Manual Mekanik
+                  </h3>
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                    Catat pekerjaan jasa langsung ke rekapitulasi mekanik
+                  </span>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setSelectedMechanicJobs(null)}
-                style={{
-                  background: '#1e293b',
-                  color: '#f8fafc',
-                  border: '1px solid #334155',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                onClick={() => setShowManualJobModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
               >
-                Tutup
+                <IoCloseOutline size={22} />
               </button>
             </div>
+
+            {manualJobError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid #ef4444',
+                color: '#f87171',
+                padding: '0.65rem',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                marginBottom: '1rem',
+              }}>
+                {manualJobError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitManualJob}>
+              {/* Mekanik */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Mekanik yang Mengerjakan <span style={{ color: '#ef4444' }}>*</span></label>
+                  <button
+                    type="button"
+                    onClick={() => setManualJobForm(prev => ({ ...prev, is_custom_mechanic: !prev.is_custom_mechanic }))}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#38bdf8',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {manualJobForm.is_custom_mechanic ? '← Pilih dari Daftar' : '+ Ketik Nama Manual'}
+                  </button>
+                </div>
+
+                {manualJobForm.is_custom_mechanic ? (
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Contoh: Budi (Freelance)"
+                    value={manualJobForm.mechanic_name}
+                    onChange={(e) => setManualJobForm(prev => ({ ...prev, mechanic_name: e.target.value }))}
+                    required
+                  />
+                ) : (
+                  <select
+                    className="form-input"
+                    value={manualJobForm.mechanic_name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__CUSTOM__') {
+                        setManualJobForm(prev => ({ ...prev, is_custom_mechanic: true, mechanic_name: '' }));
+                      } else {
+                        setManualJobForm(prev => ({ ...prev, mechanic_name: val }));
+                      }
+                    }}
+                    required
+                  >
+                    <option value="">-- Pilih Mekanik --</option>
+                    {mechanics.filter(m => m.is_active).map(m => (
+                      <option key={m.id} value={m.name}>{m.name} ({m.commission_rate || 50}%)</option>
+                    ))}
+                    <option value="__CUSTOM__">+ Ketik Nama Manual...</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Nama Jasa */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Nama Pekerjaan Jasa <span style={{ color: '#ef4444' }}>*</span></label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Contoh: Bubut Tromol / Baut Slek / Las Knalpot"
+                  value={manualJobForm.service_name}
+                  onChange={(e) => setManualJobForm(prev => ({ ...prev, service_name: e.target.value }))}
+                  required
+                />
+              </div>
+
+              {/* Tarif & Tanggal */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Tarif Jasa (Rp) <span style={{ color: '#ef4444' }}>*</span></label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-input"
+                      style={{ paddingLeft: '28px', fontFamily: 'var(--font-mono)' }}
+                      placeholder="0"
+                      value={manualJobForm.price ? formatRupiahInput(manualJobForm.price) : ''}
+                      onChange={(e) => setManualJobForm(prev => ({ ...prev, price: parseRupiahInput(e.target.value) }))}
+                      required
+                    />
+                    <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, pointerEvents: 'none' }}>
+                      Rp
+                    </span>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Tanggal</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={manualJobForm.date}
+                    onChange={(e) => setManualJobForm(prev => ({ ...prev, date: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Motor & Plat */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Plat Nomor (Opsional)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="B 1234 ABC"
+                    value={manualJobForm.vehicle_plate}
+                    onChange={(e) => setManualJobForm(prev => ({ ...prev, vehicle_plate: e.target.value.toUpperCase() }))}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Tipe Motor (Opsional)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Vario / Beat / NMAX"
+                    value={manualJobForm.vehicle_model}
+                    onChange={(e) => setManualJobForm(prev => ({ ...prev, vehicle_model: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Preview Perhitungan */}
+              {Number(manualJobForm.price) > 0 && (
+                <div style={{
+                  marginBottom: '1.25rem',
+                  padding: '0.75rem',
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#94a3b8' }}>Hak Komisi Mekanik (50%):</span>
+                    <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
+                      Rp {Number(Math.round(Number(manualJobForm.price) * 0.5)).toLocaleString('id-ID')}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>Bagian Kas Bengkel (50%):</span>
+                    <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                      Rp {Number(Math.round(Number(manualJobForm.price) * 0.5)).toLocaleString('id-ID')}
+                    </strong>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="submit"
+                  disabled={manualJobLoading}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'linear-gradient(135deg, #9333ea, #7e22ce)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: manualJobLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(147, 51, 234, 0.35)',
+                  }}
+                >
+                  {manualJobLoading ? 'Menyimpan...' : '+ Catat ke Rekap Jasa'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowManualJobModal(false)}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: '#1e293b',
+                    color: '#94a3b8',
+                    border: '1px solid #334155',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -91,4 +91,33 @@ module.exports = {
       return wrapper.response(response, 500, "Gagal mengambil rekap jasa mekanik", error);
     }
   },
+
+  createManualJob: async (request, response) => {
+    try {
+      const { service_name, price } = request.body;
+      if (!service_name || !service_name.trim()) {
+        return wrapper.response(response, 400, "Nama pekerjaan / jasa wajib diisi");
+      }
+      if (!price || Number(price) <= 0) {
+        return wrapper.response(response, 400, "Tarif jasa harus lebih dari Rp 0");
+      }
+      const newJob = await mechanicModel.createManualServiceJob(request.body);
+      return wrapper.response(response, 201, "Pekerjaan jasa mekanik berhasil dicatat", newJob);
+    } catch (error) {
+      console.error(error);
+      return wrapper.response(response, 500, "Gagal mencatat jasa mekanik manual", error);
+    }
+  },
+
+  deleteManualJob: async (request, response) => {
+    try {
+      const { id } = request.params;
+      const transactionModel = require("../models/transaction");
+      await transactionModel.deleteTransaction(id, false);
+      return wrapper.response(response, 200, "Pekerjaan jasa manual berhasil dihapus");
+    } catch (error) {
+      console.error(error);
+      return wrapper.response(response, 500, "Gagal menghapus jasa manual", error);
+    }
+  },
 };

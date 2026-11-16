@@ -280,7 +280,7 @@ module.exports = {
       console.warn("Gagal mengambil transaksi Supabase untuk rekap mekanik:", e?.message);
     }
 
-    // Ambil daftar mekanik
+    // Ambil daftar mekanik terdaftar
     let mechanicsList = await module.exports.getAllMechanics(true);
 
     const mechanicMap = {};
@@ -293,11 +293,12 @@ module.exports = {
         total_services: 0,
         total_revenue: 0,
         total_commission: 0,
+        total_workshop_share: 0,
         jobs: [],
       };
     }
 
-    // Default "Belum Dipilih / Umum"
+    // Kategori "Belum Dipilih / Umum"
     const unassignedKey = "umum / tanpa mekanik";
     mechanicMap[unassignedKey] = {
       id: null,
@@ -307,6 +308,7 @@ module.exports = {
       total_services: 0,
       total_revenue: 0,
       total_commission: 0,
+      total_workshop_share: 0,
       jobs: [],
     };
 
@@ -323,9 +325,23 @@ module.exports = {
         totalWorkshopServiceOmset += servicePrice;
         totalWorkshopServiceCount += Number(item.quantity || 1);
 
+        // Ambil nama mekanik: prioritaskan item.mechanic_name, lalu fallback ke brand_name (MEK:Nama)
         let mechName = (item.mechanic_name || "").trim();
+        let customRate = null;
+        if (!mechName && item.brand_name && item.brand_name.startsWith("MEK:")) {
+          const rawMek = item.brand_name.replace("MEK:", "").trim();
+          if (rawMek.includes("#")) {
+            const parts = rawMek.split("#");
+            mechName = parts[0].trim();
+            customRate = Number(parts[1]) || null;
+          } else {
+            mechName = rawMek;
+          }
+        }
+
         let key = mechName ? mechName.toLowerCase() : unassignedKey;
 
+        // Jika mekanik diinput manual di kasir / rekap (belum terdaftar di master data)
         if (!mechanicMap[key]) {
           mechanicMap[key] = {
             id: item.mechanic_id || null,
@@ -335,18 +351,22 @@ module.exports = {
             total_services: 0,
             total_revenue: 0,
             total_commission: 0,
+            total_workshop_share: 0,
             jobs: [],
           };
         }
 
         const mObj = mechanicMap[key];
-        const commRate = mObj.commission_rate || 50;
-        const commissionAmount = (servicePrice * commRate) / 100;
+        const commRate = customRate !== null ? customRate : (mObj.commission_rate !== undefined ? mObj.commission_rate : 50);
+        const commissionAmount = Math.round((servicePrice * commRate) / 100);
+        const workshopShare = servicePrice - commissionAmount;
 
         mObj.total_services += Number(item.quantity || 1);
         mObj.total_revenue += servicePrice;
         mObj.total_commission += commissionAmount;
+        mObj.total_workshop_share += workshopShare;
         mObj.jobs.push({
+          id: trx.id,
           invoice_number: trx.invoice_number,
           date: trx.created_at,
           customer_name: trx.customer_name,
@@ -356,7 +376,9 @@ module.exports = {
           quantity: item.quantity,
           price: item.unit_price,
           subtotal: servicePrice,
+          rate_percent: commRate,
           commission: commissionAmount,
+          workshop_share: workshopShare,
         });
       }
     }
@@ -365,11 +387,61 @@ module.exports = {
       .filter((m) => m.total_services > 0 || (m.name !== "Umum / Belum Dipilih"))
       .sort((a, b) => b.total_revenue - a.total_revenue);
 
+    let totalMechanicCommission = 0;
+    for (const m of recapList) {
+      totalMechanicCommission += m.total_commission || 0;
+    }
+    const totalWorkshopServiceProfit = totalWorkshopServiceOmset - totalMechanicCommission;
+
     return {
       period: target,
       total_workshop_service_omset: totalWorkshopServiceOmset,
       total_workshop_service_count: totalWorkshopServiceCount,
+      total_mechanic_commission: totalMechanicCommission,
+      total_workshop_service_profit: totalWorkshopServiceProfit,
       mechanics: recapList,
     };
+  },
+
+  // Input Jasa Mekanik Manual langsung dari menu Rekap Mekanik
+  createManualServiceJob: async (jobData) => {
+    const transactionModel = require("./transaction");
+    const now = jobData.date ? new Date(jobData.date) : new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const invoiceNumber = `MAN-${dateStr}-${rand}`;
+    const price = Number(jobData.price) || 0;
+    const mechName = (jobData.mechanic_name || "").trim();
+
+    const trxPayload = {
+      invoice_number: invoiceNumber,
+      customer_name: jobData.customer_name?.trim() || "Servis Manual",
+      vehicle_plate: (jobData.vehicle_plate || "").trim().toUpperCase() || "-",
+      vehicle_model: (jobData.vehicle_model || "").trim() || "Motor",
+      subtotal: price,
+      discount: 0,
+      total_amount: price,
+      payment_method: "TUNAI",
+      cash_given: price,
+      change_due: 0,
+      status: "COMPLETED",
+      notes: jobData.notes ? `[INPUT MANUAL MEKANIK] ${jobData.notes}` : "[INPUT MANUAL MEKANIK]",
+      created_at: now.toISOString(),
+    };
+
+    const items = [
+      {
+        product_name: (jobData.service_name || "Jasa Servis Manual").trim(),
+        is_service: true,
+        unit_price: price,
+        quantity: 1,
+        subtotal: price,
+        mechanic_name: mechName,
+        brand_name: mechName ? `MEK:${mechName}` : "JASA",
+      },
+    ];
+
+    const result = await transactionModel.createTransaction(trxPayload, items);
+    return result;
   },
 };

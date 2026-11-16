@@ -4,6 +4,8 @@ const mechanicController = require("../controllers/mechanic");
 const authMiddleware = require("../middleware/auth");
 
 Router.get("/recap/monthly", authMiddleware.verifyToken, mechanicController.getMonthlyRecap);
+Router.post("/manual-job", authMiddleware.verifyToken, mechanicController.createManualJob);
+Router.delete("/manual-job/:id", authMiddleware.verifyToken, mechanicController.deleteManualJob);
 Router.get("/", authMiddleware.verifyToken, mechanicController.getAllMechanics);
 Router.get("/:id", authMiddleware.verifyToken, mechanicController.getMechanicById);
 Router.post("/", authMiddleware.verifyToken, mechanicController.createMechanic);

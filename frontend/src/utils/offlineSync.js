@@ -130,18 +130,21 @@ export const syncOfflineQueue = async (api) => {
         cash_given: item.cash_given || 0,
         change_due: item.change_due || 0,
         notes: (item.notes ? item.notes + ' ' : '') + `[Sinkronisasi Transaksi Offline #${item.invoice_number}]`,
-        items: item.items.map((it) => ({
-          product_id: it.product_id || null,
-          product_name: it.product_name,
-          brand_name: it.brand_name || null,
-          is_service: Boolean(it.is_service),
-          cost_price: it.cost_price || 0,
-          unit_price: it.unit_price,
-          quantity: it.quantity,
-          subtotal: it.subtotal,
-          mechanic_id: it.mechanic_id || null,
-          mechanic_name: it.mechanic_name || null,
-        })),
+        items: item.items.map((it) => {
+          const mechName = (it.mechanic_name || '').trim();
+          return {
+            product_id: it.product_id || null,
+            product_name: it.product_name,
+            brand_name: (it.is_service && mechName) ? `MEK:${mechName}` : (it.brand_name || null),
+            is_service: Boolean(it.is_service),
+            cost_price: it.cost_price || 0,
+            unit_price: it.unit_price,
+            quantity: it.quantity,
+            subtotal: it.subtotal,
+            mechanic_id: it.mechanic_id || null,
+            mechanic_name: mechName || null,
+          };
+        }),
       };
 
       await api.post('/transactions', payload);

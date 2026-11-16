@@ -1,5 +1,17 @@
 const supabase = require("../config/supabase");
 
+// Helper untuk menormalisasi item transaksi agar nama mekanik selalu terbaca
+const normalizeItems = (items) => {
+  if (!Array.isArray(items)) return items;
+  return items.map((it) => {
+    if (it && it.is_service && !it.mechanic_name && it.brand_name && it.brand_name.startsWith("MEK:")) {
+      const raw = it.brand_name.replace("MEK:", "").trim();
+      it.mechanic_name = raw.split("#")[0].trim();
+    }
+    return it;
+  });
+};
+
 module.exports = {
   createTransaction: async (trxData, items) => {
     // 1. Simpan Header Transaksi Kasir
@@ -14,19 +26,27 @@ module.exports = {
     }
 
     // 2. Format & Simpan Seluruh Item (Sparepart + Jasa Servis)
-    const itemsToInsert = items.map((item) => ({
-      transaction_id: trx.id,
-      product_id: item.product_id || null,
-      product_name: item.product_name,
-      brand_name: item.brand_name || null,
-      is_service: Boolean(item.is_service),
-      cost_price: item.cost_price || 0,
-      unit_price: Number(item.unit_price),
-      quantity: Number(item.quantity),
-      subtotal: Number(item.subtotal || item.unit_price * item.quantity),
-      mechanic_id: item.mechanic_id ? Number(item.mechanic_id) : null,
-      mechanic_name: item.mechanic_name || null,
-    }));
+    // Nama mekanik juga di-backup ke brand_name (MEK:Nama) agar tidak hilang jika kolom mechanic_name belum ada di tabel Supabase
+    const itemsToInsert = items.map((item) => {
+      const mechName = (item.mechanic_name || "").trim();
+      let brandVal = item.brand_name || null;
+      if (item.is_service && mechName) {
+        brandVal = `MEK:${mechName}`;
+      }
+      return {
+        transaction_id: trx.id,
+        product_id: item.product_id || null,
+        product_name: item.product_name,
+        brand_name: brandVal,
+        is_service: Boolean(item.is_service),
+        cost_price: item.cost_price || 0,
+        unit_price: Number(item.unit_price),
+        quantity: Number(item.quantity),
+        subtotal: Number(item.subtotal || item.unit_price * item.quantity),
+        mechanic_id: item.mechanic_id ? Number(item.mechanic_id) : null,
+        mechanic_name: mechName || null,
+      };
+    });
 
     let { error: itemsError } = await supabase
       .from("transaction_items")
@@ -94,6 +114,10 @@ module.exports = {
       .eq("id", trx.id)
       .single();
 
+    if (fullTrx && fullTrx.items) {
+      fullTrx.items = normalizeItems(fullTrx.items);
+    }
+
     return fullTrx;
   },
 
@@ -119,6 +143,11 @@ module.exports = {
         .range(offset, offset + limit - 1)
         .then((result) => {
           if (!result.error) {
+            if (result.data) {
+              result.data.forEach((trx) => {
+                if (trx.items) trx.items = normalizeItems(trx.items);
+              });
+            }
             resolve(result);
           } else {
             reject(result);
@@ -138,6 +167,9 @@ module.exports = {
         .single()
         .then((result) => {
           if (!result.error) {
+            if (result.data && result.data.items) {
+              result.data.items = normalizeItems(result.data.items);
+            }
             resolve(result);
           } else {
             reject(result);
@@ -257,8 +289,15 @@ module.exports = {
         .eq("status", "DRAFT")
         .order("created_at", { ascending: false })
         .then((res) => {
-          if (!res.error) resolve(res.data || []);
-          else reject(res.error);
+          if (!res.error) {
+            const data = (res.data || []).map((d) => ({
+              ...d,
+              items: normalizeItems(d.items || []),
+            }));
+            resolve(data);
+          } else {
+            reject(res.error);
+          }
         });
     }),
 
@@ -298,17 +337,24 @@ module.exports = {
     // 2. Ganti seluruh item draft
     await supabase.from("transaction_items").delete().eq("transaction_id", realId);
 
-    const itemsToInsert = items.map((item) => ({
-      transaction_id: realId,
-      product_id: item.product_id || null,
-      product_name: item.product_name,
-      brand_name: item.brand_name || null,
-      is_service: Boolean(item.is_service),
-      cost_price: item.cost_price || 0,
-      unit_price: Number(item.unit_price),
-      quantity: Number(item.quantity),
-      subtotal: Number(item.subtotal || item.unit_price * item.quantity),
-    }));
+    const itemsToInsert = items.map((item) => {
+      const mechName = (item.mechanic_name || "").trim();
+      let brandVal = item.brand_name || null;
+      if (item.is_service && mechName) {
+        brandVal = `MEK:${mechName}`;
+      }
+      return {
+        transaction_id: realId,
+        product_id: item.product_id || null,
+        product_name: item.product_name,
+        brand_name: brandVal,
+        is_service: Boolean(item.is_service),
+        cost_price: item.cost_price || 0,
+        unit_price: Number(item.unit_price),
+        quantity: Number(item.quantity),
+        subtotal: Number(item.subtotal || item.unit_price * item.quantity),
+      };
+    });
 
     const { error: insertErr } = await supabase
       .from("transaction_items")
@@ -324,6 +370,10 @@ module.exports = {
       `)
       .eq("id", realId)
       .single();
+
+    if (updated && updated.items) {
+      updated.items = normalizeItems(updated.items);
+    }
 
     return updated;
   },
