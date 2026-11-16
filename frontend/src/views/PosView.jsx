@@ -48,7 +48,12 @@ import {
   IoBarcodeOutline,
   IoCloudDoneOutline,
   IoCloudOfflineOutline,
-  IoSyncOutline
+  IoSyncOutline,
+  IoCreateOutline,
+  IoCheckmarkOutline,
+  IoCloseOutline,
+  IoWalletOutline,
+  IoLocationOutline
 } from 'react-icons/io5';
 
 export const PosView = () => {
@@ -923,10 +928,13 @@ export const PosView = () => {
                             fontSize: '0.74rem',
                             cursor: 'pointer',
                             fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                           }}
                           title="Simpan harga baru"
                         >
-                          ✓
+                          <IoCheckmarkOutline size={14} />
                         </button>
                         <button
                           type="button"
@@ -939,10 +947,13 @@ export const PosView = () => {
                             padding: '3px 6px',
                             fontSize: '0.74rem',
                             cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                           }}
                           title="Batal"
                         >
-                          ✕
+                          <IoCloseOutline size={14} />
                         </button>
                       </div>
                     ) : (
@@ -962,9 +973,12 @@ export const PosView = () => {
                           padding: '1px 5px',
                           borderRadius: '4px',
                           fontWeight: 600,
-                          border: '1px solid rgba(56, 189, 248, 0.25)'
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px'
                         }}>
-                          ✏️ Ubah Tarif
+                          <IoCreateOutline size={11} /> Ubah Tarif
                         </span>
                       </div>
                     )}
@@ -1219,7 +1233,7 @@ export const PosView = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.35rem' }}>
               <div>
                 <div style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  💰 Uang Titip / DP:
+                  <IoWalletOutline size={15} /> Uang Titip / DP:
                 </div>
                 <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)' }}>
                   Titipan saat motor ditinggal
@@ -1286,10 +1300,13 @@ export const PosView = () => {
                     borderRadius: '4px',
                     color: '#f87171',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                   title="Hapus nominal uang titip"
                 >
-                  ✕
+                  <IoCloseOutline size={12} />
                 </button>
               )}
             </div>
@@ -1505,10 +1522,12 @@ export const PosView = () => {
               gap: '0.5rem'
             }}>
               <div>
-                <strong>🛵 Mode Antrean Motor:</strong> {vehiclePlate || 'Tanpa Plat'} {vehicleModel ? `(${vehicleModel})` : ''} - {customerName}
+                <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <IoTimeOutline size={15} /> Mode Antrean Motor:
+                </strong> {vehiclePlate || 'Tanpa Plat'} {vehicleModel ? `(${vehicleModel})` : ''} - {customerName}
                 {depositNum > 0 && (
-                  <span style={{ marginLeft: '8px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '2px 7px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                    💰 Sudah Titip DP: {formatCurrency(depositNum)} (Sisa: {formatCurrency(remainingDue)})
+                  <span style={{ marginLeft: '8px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '2px 7px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <IoWalletOutline size={13} /> Sudah Titip DP: {formatCurrency(depositNum)} (Sisa: {formatCurrency(remainingDue)})
                   </span>
                 )}
               </div>
@@ -1762,8 +1781,8 @@ export const PosView = () => {
                       )}
 
                       {p.rack_location && (
-                        <div className="product-rack">
-                          📍 {p.rack_location}
+                        <div className="product-rack" style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <IoLocationOutline size={12} /> {p.rack_location}
                         </div>
                       )}
                     </div>
@@ -1854,16 +1873,16 @@ export const PosView = () => {
       {/* MODAL INPUT PART LUAR / JASA MANUAL */}
       {showManualModal && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '440px', padding: '1.25rem' }}>
+          <div className="modal-content" style={{ maxWidth: '420px', padding: '1.25rem' }}>
             <div className="modal-header" style={{ marginBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.45rem', color: manualIsService ? '#c084fc' : '#fbbf24' }}>
                 {manualIsService ? (
                   <>
-                    <IoConstructOutline color="#c084fc" size={20} /> Input Jasa Manual / Ongkos Tambahan
+                    <IoConstructOutline color="#c084fc" size={20} /> Input Jasa / Ongkos
                   </>
                 ) : (
                   <>
-                    <IoCubeOutline color="#fbbf24" size={20} /> Input Part Luar / Non-Stok
+                    <IoCubeOutline color="#fbbf24" size={20} /> Input Part Luar
                   </>
                 )}
               </h3>
@@ -1874,8 +1893,8 @@ export const PosView = () => {
 
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: '1.4' }}>
               {manualIsService
-                ? 'Untuk ongkos pengerjaan khusus, baut macet/slek, bubut, las, atau jasa dadakan tanpa perlu ada di katalog.'
-                : 'Untuk sparepart yang dibeli mendadak di toko luar tanpa perlu memotong stok gudang.'}
+                ? 'Input nama jasa pengerjaan dan tarif biaya servis.'
+                : 'Input sparepart yang dibeli dadakan di toko luar tanpa stok gudang.'}
             </p>
 
             <form onSubmit={handleAddManualItem}>
@@ -1893,10 +1912,14 @@ export const PosView = () => {
                       background: manualIsService ? 'rgba(168, 85, 247, 0.2)' : 'var(--bg-input)',
                       border: `1px solid ${manualIsService ? '#a855f7' : 'var(--border-color)'}`,
                       color: manualIsService ? '#c084fc' : 'var(--text-muted)',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
                     }}
                   >
-                    🔧 Jasa / Ongkos
+                    <IoConstructOutline size={14} /> Jasa / Ongkos
                   </button>
                   <button
                     type="button"
@@ -1909,63 +1932,71 @@ export const PosView = () => {
                       background: !manualIsService ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-input)',
                       border: `1px solid ${!manualIsService ? '#f59e0b' : 'var(--border-color)'}`,
                       color: !manualIsService ? '#fbbf24' : 'var(--text-muted)',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
                     }}
                   >
-                    📦 Sparepart Luar
+                    <IoCubeOutline size={14} /> Sparepart Luar
                   </button>
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: '0.75rem' }}>
                 <label className="form-label">
-                  {manualIsService ? 'Nama Jasa Pengerjaan' : 'Nama Sparepart Luar'} <span style={{ color: '#ef4444' }}>*</span>
+                  {manualIsService ? 'Nama Jasa' : 'Nama Sparepart Luar'} <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder={manualIsService ? "contoh: Jasa Buka Baut Slek, Las Knalpot, Bubut..." : "contoh: Kampas Rem Beli Toko Sebelah, Baut M8..."}
+                  placeholder={manualIsService ? "contoh: Baut Slek, Las Knalpot, Bubut, Pasang..." : "contoh: Kampas Rem, Baut M8, dll"}
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
                   autoFocus
                   required
                 />
-
-                {manualIsService && (
-                  <div style={{ marginTop: '0.45rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', alignSelf: 'center' }}>Shortcut:</span>
-                    {[
-                      'Baut Macet / Slek',
-                      'Bor & Tap Drat Baut',
-                      'Las Knalpot / Rangka',
-                      'Bubut Tromol / As',
-                      'Pasang Part Luar',
-                      'Servis Tambahan',
-                    ].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => setManualName(tag)}
-                        style={{
-                          background: manualName === tag ? 'rgba(168, 85, 247, 0.35)' : 'rgba(30, 41, 59, 0.8)',
-                          border: `1px solid ${manualName === tag ? '#c084fc' : '#334155'}`,
-                          borderRadius: '4px',
-                          padding: '2px 7px',
-                          fontSize: '0.71rem',
-                          color: manualName === tag ? '#f3e8ff' : '#cbd5e1',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
+              <div className="form-group" style={{ marginBottom: manualIsService ? '0.75rem' : '1.15rem' }}>
+                <label className="form-label">
+                  {manualIsService ? 'Tarif Jasa (Rp)' : 'Harga Jual (Rp)'} <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="form-input"
+                    style={{ paddingLeft: '28px', fontFamily: 'var(--font-mono)' }}
+                    placeholder="0"
+                    value={manualPrice ? formatRupiahInput(manualPrice) : ''}
+                    onChange={(e) => setManualPrice(parseRupiahInput(e.target.value))}
+                    required
+                  />
+                  <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, pointerEvents: 'none' }}>
+                    Rp
+                  </span>
+                </div>
+              </div>
+
+              {!manualIsService && (
+                <div className="form-group" style={{ marginBottom: '1.15rem' }}>
+                  <label className="form-label">Jumlah (Qty)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={manualQty}
+                    onChange={(e) => setManualQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    required
+                  />
+                </div>
+              )}
+
               {manualIsService && (
-                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label className="form-label">Mekanik yang Mengerjakan (Opsional)</label>
+                <div className="form-group" style={{ marginBottom: '1.15rem' }}>
+                  <label className="form-label">Mekanik (Opsional)</label>
                   <select
                     className="form-input"
                     value={manualMechanicName}
@@ -1977,46 +2008,13 @@ export const PosView = () => {
                     }}
                     style={{ fontSize: '0.82rem' }}
                   >
-                    <option value="">-- Pilih Mekanik (Bisa diatur nanti di faktur) --</option>
+                    <option value="">-- Pilih Mekanik (Bisa diatur di faktur) --</option>
                     {mechanics.filter(m => m.is_active).map(m => (
                       <option key={m.id} value={m.name}>{m.name}</option>
                     ))}
                   </select>
                 </div>
               )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.65rem', marginBottom: '1.15rem' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Tarif / Harga (Rp) <span style={{ color: '#ef4444' }}>*</span></label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="form-input"
-                      style={{ paddingLeft: '28px', fontFamily: 'var(--font-mono)' }}
-                      placeholder="0"
-                      value={manualPrice ? formatRupiahInput(manualPrice) : ''}
-                      onChange={(e) => setManualPrice(parseRupiahInput(e.target.value))}
-                      required
-                    />
-                    <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, pointerEvents: 'none' }}>
-                      Rp
-                    </span>
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Jumlah (Qty)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={manualQty}
-                    onChange={(e) => setManualQty(Math.max(1, parseInt(e.target.value) || 1))}
-                    required
-                  />
-                </div>
-              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '0.65rem' }}>
                 <button
@@ -2039,7 +2037,7 @@ export const PosView = () => {
                     boxShadow: manualIsService ? '0 2px 10px rgba(147, 51, 234, 0.4)' : 'none'
                   }}
                 >
-                  + Masukkan ke Faktur
+                  {manualIsService ? '+ Tambah Jasa' : '+ Tambah Part'}
                 </button>
               </div>
             </form>
@@ -2066,7 +2064,7 @@ export const PosView = () => {
 
             {drafts.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-                🛵 Tidak ada antrean motor yang sedang ditinggal saat ini.
+                Tidak ada antrean motor yang sedang ditinggal saat ini.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -2121,7 +2119,7 @@ export const PosView = () => {
                           </div>
                           {Number(draft.cash_given) > 0 ? (
                             <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: '2px' }}>
-                              <span>💰 Titip DP: {formatCurrency(draft.cash_given)}</span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IoWalletOutline size={12} /> Titip DP: {formatCurrency(draft.cash_given)}</span>
                               <span style={{ marginLeft: '6px', color: '#38bdf8', fontWeight: 700 }}>
                                 (Sisa: {formatCurrency(Math.max(0, Number(draft.total_amount) - Number(draft.cash_given)))})
                               </span>
@@ -2151,7 +2149,7 @@ export const PosView = () => {
                               gap: '4px'
                             }}
                           >
-                            ✏️ Buka & Lengkapi / Bayar
+                            <IoCreateOutline size={14} /> Buka & Lengkapi / Bayar
                           </button>
 
                           <button

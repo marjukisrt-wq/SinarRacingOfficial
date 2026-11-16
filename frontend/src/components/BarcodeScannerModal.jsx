@@ -731,7 +731,7 @@ export const BarcodeScannerModal = ({
               }}
               title="Pilih gambar atau foto barcode kemasan dari galeri"
             >
-              📷 Foto/Galeri
+              <IoCameraOutline size={16} /> Foto / Galeri
             </button>
             <input
               type="file"
@@ -754,7 +754,7 @@ export const BarcodeScannerModal = ({
             color: '#94a3b8',
             lineHeight: 1.45,
           }}>
-            <strong style={{ color: '#facc15' }}>💡 Info Barcode Yamaha / Honda:</strong> Barcode resmi motor (Code 39) mengodekan nomor part tanpa tanda strip (misal: <code>3C1H21003000</code>). Sistem otomatis mengenali dan mencocokkannya ke kode part bertanda strip (<code>3C1-H2100-30</code>). Jika kemasan plastik berkerut atau silau, Anda bisa langsung ketik nomor part yang tertera lalu klik <strong>Pakai Kode</strong>.
+            <strong style={{ color: '#facc15', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IoBarcodeOutline size={14} /> Info Barcode Yamaha / Honda:</strong> Barcode resmi motor (Code 39) mengodekan nomor part tanpa tanda strip (misal: <code>3C1H21003000</code>). Sistem otomatis mengenali dan mencocokkannya ke kode part bertanda strip (<code>3C1-H2100-30</code>). Jika kemasan plastik berkerut atau silau, Anda bisa langsung ketik nomor part yang tertera lalu klik <strong>Pakai Kode</strong>.
           </div>
 
           {products && products.length > 0 && mode !== 'CAPTURE_CODE' && (

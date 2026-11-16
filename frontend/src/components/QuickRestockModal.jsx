@@ -91,7 +91,7 @@ export const QuickRestockModal = ({ product, onClose, onSuccess }) => {
               <span>Jenis Aksi Stok</span>
               {isSuperAdmin && (
                 <span style={{ fontSize: '0.72rem', color: '#60a5fa', fontWeight: 700 }}>
-                  👑 Mode Admin Aktif
+                  Mode Admin Aktif
                 </span>
               )}
             </label>
@@ -148,7 +148,7 @@ export const QuickRestockModal = ({ product, onClose, onSuccess }) => {
                   }}
                   title="Khusus Admin: Atur langsung angka stok persis di gudang"
                 >
-                  ✏️ Edit Jumlah
+                  <IoCreateOutline size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Edit Jumlah
                 </button>
               )}
             </div>

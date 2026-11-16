@@ -19,7 +19,9 @@ import {
   IoTimeOutline,
   IoConstructOutline,
   IoCubeOutline,
-  IoCashOutline
+  IoCashOutline,
+  IoCreateOutline,
+  IoFolderOpenOutline
 } from 'react-icons/io5';
 
 const MONTH_NAMES = [
@@ -450,12 +452,12 @@ export const TransactionsView = ({ onNavigateToPos }) => {
                 <span>Total Laba:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(todayStats.totalProfit)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc' }}>
-                <span>🔧 Keuntungan Jasa:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', alignItems: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><IoConstructOutline size={13} /> Keuntungan Jasa:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(todayStats.profitJasa)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8' }}>
-                <span>📦 Keuntungan Part:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8', alignItems: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><IoCubeOutline size={13} /> Keuntungan Part:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(todayStats.profitSparepart)}</span>
               </div>
             </div>
@@ -517,12 +519,12 @@ export const TransactionsView = ({ onNavigateToPos }) => {
                 <span>Total Laba:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(monthStats.totalProfit)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc' }}>
-                <span>🔧 Keuntungan Jasa:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', alignItems: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><IoConstructOutline size={13} /> Keuntungan Jasa:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(monthStats.profitJasa)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8' }}>
-                <span>📦 Keuntungan Part:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8', alignItems: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><IoCubeOutline size={13} /> Keuntungan Part:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(monthStats.profitSparepart)}</span>
               </div>
             </div>
@@ -584,12 +586,12 @@ export const TransactionsView = ({ onNavigateToPos }) => {
                 <span>Total Laba:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(yearStats.totalProfit)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc' }}>
-                <span>🔧 Keuntungan Jasa:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', alignItems: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><IoConstructOutline size={13} /> Keuntungan Jasa:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(yearStats.profitJasa)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8' }}>
-                <span>📦 Keuntungan Part:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8', alignItems: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><IoCubeOutline size={13} /> Keuntungan Part:</span>
                 <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(yearStats.profitSparepart)}</span>
               </div>
             </div>
@@ -671,10 +673,10 @@ export const TransactionsView = ({ onNavigateToPos }) => {
               <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#facc15', fontFamily: 'var(--font-mono)' }}>
                 {formatCurrency(currentPeriodStats.totalProfit)}
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '2px' }}>
-                <span style={{ color: '#c084fc', fontWeight: 600 }}>🔧 Jasa: {formatCurrency(currentPeriodStats.profitJasa)}</span>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '2px', alignItems: 'center' }}>
+                <span style={{ color: '#c084fc', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IoConstructOutline size={12} /> Jasa: {formatCurrency(currentPeriodStats.profitJasa)}</span>
                 <span>•</span>
-                <span style={{ color: '#38bdf8', fontWeight: 600 }}>📦 Part: {formatCurrency(currentPeriodStats.profitSparepart)}</span>
+                <span style={{ color: '#38bdf8', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IoCubeOutline size={12} /> Part: {formatCurrency(currentPeriodStats.profitSparepart)}</span>
               </div>
             </div>
           )}
@@ -1079,7 +1081,9 @@ export const TransactionsView = ({ onNavigateToPos }) => {
             ) : finalFilteredTx.length === 0 ? (
               <tr>
                 <td colSpan={isSuperAdmin ? "8" : "7"} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }}>📂</div>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5, display: 'flex', justifyContent: 'center' }}>
+                    <IoFolderOpenOutline size={40} />
+                  </div>
                   <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.25rem', color: 'var(--text-main)' }}>
                     Tidak ada catatan ditemukan
                   </div>
@@ -1150,7 +1154,7 @@ export const TransactionsView = ({ onNavigateToPos }) => {
                           color: '#fbbf24',
                           border: '1px solid rgba(245, 158, 11, 0.4)'
                         }}>
-                          🛵 DRAFT (MOTOR DITINGGAL)
+                          DRAFT (MOTOR DITINGGAL)
                         </span>
                       ) : (
                         <span style={{
@@ -1198,9 +1202,9 @@ export const TransactionsView = ({ onNavigateToPos }) => {
                               <div style={{ fontWeight: 800, color: '#facc15', fontFamily: 'var(--font-mono)', fontSize: '0.88rem' }}>
                                 {formatCurrency(txProfit.totalProfit)}
                               </div>
-                              <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px', display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                <span style={{ color: '#c084fc', fontWeight: 600 }} title="Keuntungan Jasa">🔧 {formatCurrency(txProfit.profitJasa)}</span>
-                                <span style={{ color: '#38bdf8', fontWeight: 600 }} title="Keuntungan Sparepart">📦 {formatCurrency(txProfit.profitSparepart)}</span>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '2px', display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
+                                <span style={{ color: '#c084fc', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }} title="Keuntungan Jasa"><IoConstructOutline size={12} /> {formatCurrency(txProfit.profitJasa)}</span>
+                                <span style={{ color: '#38bdf8', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }} title="Keuntungan Sparepart"><IoCubeOutline size={12} /> {formatCurrency(txProfit.profitSparepart)}</span>
                               </div>
                             </div>
                           );
@@ -1230,7 +1234,7 @@ export const TransactionsView = ({ onNavigateToPos }) => {
                               }}
                               title="Buka kembali antrean ini di kasir untuk melengkapi dan melakukan cetak struk"
                             >
-                              ✏️ Buka & Lengkapi di Kasir
+                              <IoCreateOutline size={14} /> Buka & Lengkapi di Kasir
                             </button>
 
                             <button

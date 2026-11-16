@@ -14,7 +14,8 @@ import {
   IoPrintOutline, 
   IoCloseCircleOutline, 
   IoCheckmarkCircleOutline,
-  IoSyncOutline
+  IoSyncOutline,
+  IoWarningOutline
 } from 'react-icons/io5';
 
 export const ThermalReceipt = ({ transaction, store, onClose }) => {
@@ -122,8 +123,8 @@ export const ThermalReceipt = ({ transaction, store, onClose }) => {
             lineHeight: '1.45',
             whiteSpace: 'pre-line'
           }}>
-            <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '4px' }}>
-              ⚠️ Kendala Koneksi Printer:
+            <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <IoWarningOutline size={15} /> Kendala Koneksi Printer:
             </div>
             {errorMsg}
             <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid rgba(239, 68, 68, 0.25)' }}>
@@ -298,7 +299,9 @@ export const ThermalReceipt = ({ transaction, store, onClose }) => {
             borderRadius: '6px',
             marginBottom: '0.65rem'
           }}>
-            <span>✓ Terhubung: <strong>{connectedDeviceName}</strong></span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <IoCheckmarkCircleOutline size={13} color="#10b981" /> Terhubung: <strong>{connectedDeviceName}</strong>
+            </span>
             <button
               onClick={() => handlePrintBluetooth(true)}
               style={{

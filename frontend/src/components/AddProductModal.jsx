@@ -370,7 +370,7 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
                   }}
                   title="Generate kode barcode acak unik otomatis"
                 >
-                  🎲 Buat Barcode
+                  <IoBarcodeOutline size={14} style={{ marginRight: '4px' }} /> Buat Barcode
                 </button>
               </div>
 
@@ -465,12 +465,12 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
                   <span>{productToEdit ? 'Jumlah Stok Fisik' : 'Stok Fisik Awal'}</span>
                   {productToEdit && isSuperAdmin && (
                     <span style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: 700 }}>
-                      👑 Hak Admin: Bisa diedit
+                      Hak Admin: Bisa diedit
                     </span>
                   )}
                   {productToEdit && !isSuperAdmin && (
                     <span style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: 700 }}>
-                      🔒 Hanya Admin
+                      Hanya Admin
                     </span>
                   )}
                 </label>
