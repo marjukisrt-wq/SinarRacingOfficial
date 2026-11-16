@@ -76,12 +76,18 @@ export const PosView = () => {
   const [showDraftsModal, setShowDraftsModal] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState(null);
 
-  // Input Item Manual / Part Beli di Luar (Non-Stok)
+  // Input Item Manual / Part Beli di Luar (Non-Stok) & Jasa Manual
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualName, setManualName] = useState('');
   const [manualPrice, setManualPrice] = useState('');
   const [manualQty, setManualQty] = useState(1);
   const [manualIsService, setManualIsService] = useState(false);
+  const [manualMechanicId, setManualMechanicId] = useState('');
+  const [manualMechanicName, setManualMechanicName] = useState('');
+
+  // Quick edit tarif harga item di keranjang faktur
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editingPriceValue, setEditingPriceValue] = useState('');
 
   // Mobile Tab State: 'catalog' (Katalog Part) atau 'cart' (Faktur Kasir)
   const [mobileTab, setMobileTab] = useState('catalog');
@@ -632,6 +638,23 @@ export const PosView = () => {
     );
   };
 
+  const updateCartItemPrice = (identifier, newPrice) => {
+    const validPrice = Math.max(0, Number(newPrice) || 0);
+    setCart((prev) =>
+      prev.map((item) => {
+        const match = (item.cart_item_id && item.cart_item_id === identifier) || item.product_id === identifier;
+        if (match) {
+          return {
+            ...item,
+            unit_price: validPrice,
+            subtotal: validPrice * item.quantity,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
   const handleAddManualItem = (e) => {
     if (e) e.preventDefault();
     const trimmed = manualName.trim();
@@ -639,11 +662,11 @@ export const PosView = () => {
     const qty = Number(manualQty) || 1;
 
     if (!trimmed) {
-      alert('Silakan isi nama sparepart atau jasa luar!');
+      alert(`Silakan isi nama ${manualIsService ? 'jasa pengerjaan' : 'sparepart luar'}!`);
       return;
     }
     if (price <= 0) {
-      alert('Silakan isi harga jual yang valid (harus lebih dari Rp 0)!');
+      alert('Silakan isi tarif / harga yang valid (harus lebih dari Rp 0)!');
       return;
     }
 
@@ -659,8 +682,8 @@ export const PosView = () => {
       is_service: manualIsService,
       max_stock: 9999,
       is_manual: true,
-      mechanic_id: null,
-      mechanic_name: '',
+      mechanic_id: manualMechanicId || null,
+      mechanic_name: manualMechanicName || '',
     };
 
     setCart((prev) => [...prev, newItem]);
@@ -668,6 +691,8 @@ export const PosView = () => {
     setManualPrice('');
     setManualQty(1);
     setManualIsService(false);
+    setManualMechanicId('');
+    setManualMechanicName('');
     setShowManualModal(false);
   };
 
@@ -700,17 +725,54 @@ export const PosView = () => {
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           <button
             type="button"
-            onClick={() => setShowManualModal(true)}
+            onClick={() => {
+              setManualIsService(true);
+              setManualName('');
+              setManualPrice('');
+              setManualQty(1);
+              setManualMechanicId('');
+              setManualMechanicName('');
+              setShowManualModal(true);
+            }}
+            style={{
+              background: 'rgba(168, 85, 247, 0.15)',
+              color: '#c084fc',
+              border: '1px solid rgba(168, 85, 247, 0.45)',
+              borderRadius: '6px',
+              padding: '3px 8px',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px',
+              cursor: 'pointer'
+            }}
+            title="Input jasa dadakan, baut macet/slek, bubut, las, dll"
+          >
+            <IoConstructOutline size={14} /> + Jasa Manual
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setManualIsService(false);
+              setManualName('');
+              setManualPrice('');
+              setManualQty(1);
+              setManualMechanicId('');
+              setManualMechanicName('');
+              setShowManualModal(true);
+            }}
             style={{
               background: 'rgba(245, 158, 11, 0.15)',
               color: '#fbbf24',
               border: '1px solid rgba(245, 158, 11, 0.35)',
               borderRadius: '6px',
               padding: '3px 8px',
-              fontSize: '0.75rem',
+              fontSize: '0.74rem',
               fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
@@ -719,7 +781,7 @@ export const PosView = () => {
             }}
             title="Tambah part yang dibeli di luar dadakan"
           >
-            <IoAddCircleOutline size={15} /> + Part Luar
+            <IoCubeOutline size={14} /> + Part Luar
           </button>
 
           {cart.length > 0 && (
@@ -811,7 +873,101 @@ export const PosView = () => {
                     {item.product_name}
                   </div>
                   <div className="cart-item-sub">
-                    {formatCurrency(item.unit_price)}
+                    {editingItemId === itemKey ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={editingPriceValue ? formatRupiahInput(editingPriceValue) : ''}
+                            onChange={(e) => setEditingPriceValue(parseRupiahInput(e.target.value))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                updateCartItemPrice(itemKey, editingPriceValue);
+                                setEditingItemId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingItemId(null);
+                              }
+                            }}
+                            autoFocus
+                            placeholder="0"
+                            style={{
+                              width: '100px',
+                              padding: '2px 6px 2px 22px',
+                              fontSize: '0.78rem',
+                              background: '#1e293b',
+                              border: '1px solid #38bdf8',
+                              borderRadius: '4px',
+                              color: '#38bdf8',
+                              fontWeight: 700,
+                              fontFamily: 'var(--font-mono)',
+                              outline: 'none',
+                            }}
+                          />
+                          <span style={{ position: 'absolute', left: '5px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, pointerEvents: 'none' }}>
+                            Rp
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateCartItemPrice(itemKey, editingPriceValue);
+                            setEditingItemId(null);
+                          }}
+                          style={{
+                            background: '#16a34a',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '3px 8px',
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                          title="Simpan harga baru"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingItemId(null)}
+                          style={{
+                            background: '#334155',
+                            color: '#cbd5e1',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '3px 6px',
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                          }}
+                          title="Batal"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+                        onClick={() => {
+                          setEditingItemId(itemKey);
+                          setEditingPriceValue(item.unit_price);
+                        }}
+                        title="Klik untuk ubah tarif jasa atau harga barang"
+                      >
+                        <span style={{ fontWeight: 700 }}>{formatCurrency(item.unit_price)}</span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          color: '#38bdf8',
+                          background: 'rgba(56, 189, 248, 0.1)',
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          border: '1px solid rgba(56, 189, 248, 0.25)'
+                        }}>
+                          ✏️ Ubah Tarif
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {item.is_service && (
                     <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -1241,7 +1397,45 @@ export const PosView = () => {
           }}>
             <button
               type="button"
-              onClick={() => setShowManualModal(true)}
+              onClick={() => {
+                setManualIsService(true);
+                setManualName('');
+                setManualPrice('');
+                setManualQty(1);
+                setManualMechanicId('');
+                setManualMechanicName('');
+                setShowManualModal(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.45rem 0.85rem',
+                background: 'rgba(168, 85, 247, 0.15)',
+                border: '1px solid rgba(168, 85, 247, 0.45)',
+                borderRadius: '8px',
+                color: '#c084fc',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+              }}
+              title="Input jasa dadakan, baut macet/slek, bubut, las, dll"
+            >
+              <IoConstructOutline size={18} />
+              <span>+ Jasa Manual</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setManualIsService(false);
+                setManualName('');
+                setManualPrice('');
+                setManualQty(1);
+                setManualMechanicId('');
+                setManualMechanicName('');
+                setShowManualModal(true);
+              }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1255,10 +1449,10 @@ export const PosView = () => {
                 fontSize: '0.82rem',
                 cursor: 'pointer',
               }}
-              title="Input sparepart atau jasa yang dibeli di luar dadakan tanpa stok gudang"
+              title="Input sparepart yang dibeli di luar dadakan tanpa stok gudang"
             >
-              <IoAddCircleOutline size={18} />
-              <span>+ Input Part Luar / Manual</span>
+              <IoCubeOutline size={18} />
+              <span>+ Part Luar</span>
             </button>
 
             <button
@@ -1657,13 +1851,21 @@ export const PosView = () => {
         />
       )}
 
-      {/* MODAL INPUT PART LUAR / MANUAL */}
+      {/* MODAL INPUT PART LUAR / JASA MANUAL */}
       {showManualModal && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '420px', padding: '1.25rem' }}>
+          <div className="modal-content" style={{ maxWidth: '440px', padding: '1.25rem' }}>
             <div className="modal-header" style={{ marginBottom: '0.85rem' }}>
-              <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#fbbf24' }}>
-                <IoAddCircleOutline color="#fbbf24" size={20} /> Input Part Luar / Manual
+              <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.45rem', color: manualIsService ? '#c084fc' : '#fbbf24' }}>
+                {manualIsService ? (
+                  <>
+                    <IoConstructOutline color="#c084fc" size={20} /> Input Jasa Manual / Ongkos Tambahan
+                  </>
+                ) : (
+                  <>
+                    <IoCubeOutline color="#fbbf24" size={20} /> Input Part Luar / Non-Stok
+                  </>
+                )}
               </h3>
               <button className="modal-close-btn" onClick={() => setShowManualModal(false)}>
                 <IoCloseCircleOutline size={22} />
@@ -1671,29 +1873,15 @@ export const PosView = () => {
             </div>
 
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: '1.4' }}>
-              Untuk barang yang dibeli mendadak di luar toko atau jasa non-katalog tanpa perlu stok gudang.
+              {manualIsService
+                ? 'Untuk ongkos pengerjaan khusus, baut macet/slek, bubut, las, atau jasa dadakan tanpa perlu ada di katalog.'
+                : 'Untuk sparepart yang dibeli mendadak di toko luar tanpa perlu memotong stok gudang.'}
             </p>
 
             <form onSubmit={handleAddManualItem}>
               <div className="form-group" style={{ marginBottom: '0.75rem' }}>
                 <label className="form-label">Tipe Item</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setManualIsService(false)}
-                    style={{
-                      padding: '0.45rem',
-                      borderRadius: '6px',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      background: !manualIsService ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-input)',
-                      border: `1px solid ${!manualIsService ? '#f59e0b' : 'var(--border-color)'}`,
-                      color: !manualIsService ? '#fbbf24' : 'var(--text-muted)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    📦 Sparepart Luar
-                  </button>
                   <button
                     type="button"
                     onClick={() => setManualIsService(true)}
@@ -1710,25 +1898,96 @@ export const PosView = () => {
                   >
                     🔧 Jasa / Ongkos
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualIsService(false)}
+                    style={{
+                      padding: '0.45rem',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      background: !manualIsService ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-input)',
+                      border: `1px solid ${!manualIsService ? '#f59e0b' : 'var(--border-color)'}`,
+                      color: !manualIsService ? '#fbbf24' : 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📦 Sparepart Luar
+                  </button>
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                <label className="form-label">Nama Barang / Jasa <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label">
+                  {manualIsService ? 'Nama Jasa Pengerjaan' : 'Nama Sparepart Luar'} <span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder={manualIsService ? "contoh: Jasa Bubut Tromol / Pasang Luar" : "contoh: Kampas Rem Beli Toko Sebelah"}
+                  placeholder={manualIsService ? "contoh: Jasa Buka Baut Slek, Las Knalpot, Bubut..." : "contoh: Kampas Rem Beli Toko Sebelah, Baut M8..."}
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
                   autoFocus
                   required
                 />
+
+                {manualIsService && (
+                  <div style={{ marginTop: '0.45rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b', alignSelf: 'center' }}>Shortcut:</span>
+                    {[
+                      'Baut Macet / Slek',
+                      'Bor & Tap Drat Baut',
+                      'Las Knalpot / Rangka',
+                      'Bubut Tromol / As',
+                      'Pasang Part Luar',
+                      'Servis Tambahan',
+                    ].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setManualName(tag)}
+                        style={{
+                          background: manualName === tag ? 'rgba(168, 85, 247, 0.35)' : 'rgba(30, 41, 59, 0.8)',
+                          border: `1px solid ${manualName === tag ? '#c084fc' : '#334155'}`,
+                          borderRadius: '4px',
+                          padding: '2px 7px',
+                          fontSize: '0.71rem',
+                          color: manualName === tag ? '#f3e8ff' : '#cbd5e1',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {manualIsService && (
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label className="form-label">Mekanik yang Mengerjakan (Opsional)</label>
+                  <select
+                    className="form-input"
+                    value={manualMechanicName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setManualMechanicName(val);
+                      const found = mechanics.find(m => m.name === val);
+                      setManualMechanicId(found ? found.id : null);
+                    }}
+                    style={{ fontSize: '0.82rem' }}
+                  >
+                    <option value="">-- Pilih Mekanik (Bisa diatur nanti di faktur) --</option>
+                    {mechanics.filter(m => m.is_active).map(m => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.65rem', marginBottom: '1.15rem' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Harga Jual (Rp) <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label className="form-label">Tarif / Harga (Rp) <span style={{ color: '#ef4444' }}>*</span></label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type="text"
@@ -1771,9 +2030,16 @@ export const PosView = () => {
                 <button
                   type="submit"
                   className="btn-primary"
-                  style={{ padding: '0.65rem', background: '#f59e0b', color: '#000', fontWeight: 800 }}
+                  style={{
+                    padding: '0.65rem',
+                    background: manualIsService ? 'linear-gradient(135deg, #9333ea, #7e22ce)' : '#f59e0b',
+                    color: manualIsService ? '#fff' : '#000',
+                    fontWeight: 800,
+                    border: 'none',
+                    boxShadow: manualIsService ? '0 2px 10px rgba(147, 51, 234, 0.4)' : 'none'
+                  }}
                 >
-                  + Masukkan Faktur
+                  + Masukkan ke Faktur
                 </button>
               </div>
             </form>
