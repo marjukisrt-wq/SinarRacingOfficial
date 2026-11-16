@@ -3,8 +3,9 @@ const path = require("path");
 const supabase = require("../config/supabase");
 
 const LOCAL_FILE = path.resolve(__dirname, "../../data/mechanics.json");
+const CLOUD_FALLBACK_ID = 99; // Row cadangan di Supabase store_settings jika tabel mechanics belum dibuat
 
-const withTimeout = (promise, ms = 2500) => {
+const withTimeout = (promise, ms = 3000) => {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
@@ -13,6 +14,7 @@ const withTimeout = (promise, ms = 2500) => {
   ]);
 };
 
+// Baca cadangan lokal file JSON (jika filesystem writable)
 const readLocalMechanics = () => {
   try {
     if (!fs.existsSync(LOCAL_FILE)) {
@@ -21,7 +23,6 @@ const readLocalMechanics = () => {
     const data = fs.readFileSync(LOCAL_FILE, "utf-8");
     return JSON.parse(data || "[]");
   } catch (e) {
-    console.error("Gagal membaca local mechanics.json:", e);
     return [];
   }
 };
@@ -30,28 +31,91 @@ const writeLocalMechanics = (data) => {
   try {
     fs.writeFileSync(LOCAL_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (e) {
-    console.error("Gagal menulis local mechanics.json:", e);
+    // Abaikan jika di Vercel serverless read-only filesystem
+  }
+};
+
+// Helper: Cek apakah tabel dedicated 'mechanics' ada di Supabase
+let dedicatedTableExists = null;
+const checkDedicatedTable = async () => {
+  if (dedicatedTableExists !== null) return dedicatedTableExists;
+  try {
+    const { error } = await withTimeout(supabase.from("mechanics").select("id").limit(1), 2500);
+    if (!error) {
+      dedicatedTableExists = true;
+      return true;
+    }
+    if (error && error.code === "PGRST205") {
+      dedicatedTableExists = false;
+      return false;
+    }
+  } catch (e) {
+    // Timeout atau offline
+  }
+  return false;
+};
+
+// Helper: Ambil data mekanik dari Supabase Cloud Store (id: 99)
+const readCloudStore = async () => {
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from("store_settings").select("address").eq("id", CLOUD_FALLBACK_ID).single(),
+      3000
+    );
+    if (!error && data && data.address) {
+      const parsed = JSON.parse(data.address);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+
+  return null;
+};
+
+// Helper: Simpan data mekanik ke Supabase Cloud Store (id: 99)
+const writeCloudStore = async (list) => {
+  try {
+    await withTimeout(
+      supabase.from("store_settings").upsert({
+        id: CLOUD_FALLBACK_ID,
+        store_name: "__MECHANICS_DATA__",
+        tagline: "MECHANICS",
+        address: JSON.stringify(list),
+        phone: "SYSTEM",
+        updated_at: new Date().toISOString(),
+      }),
+      3500
+    );
+  } catch (e) {
+    console.warn("Gagal simpan ke Supabase Cloud Store id 99:", e?.message);
   }
 };
 
 module.exports = {
   getAllMechanics: async (includeInactive = false) => {
-    // 1. Coba dari Supabase jika tersedia (maks 2.5 detik)
-    try {
-      let query = supabase.from("mechanics").select("*").order("name", { ascending: true });
-      if (!includeInactive) {
-        query = query.eq("is_active", true);
-      }
-      const { data, error } = await withTimeout(query, 2000);
-      if (!error && data && data.length > 0) {
-        return data;
-      }
-    } catch (e) {
-      // Abaikan jika tabel belum ada atau timeout offline
+    // 1. Coba dari tabel dedicated Supabase jika ada
+    const hasTable = await checkDedicatedTable();
+    if (hasTable) {
+      try {
+        let query = supabase.from("mechanics").select("*").order("name", { ascending: true });
+        if (!includeInactive) {
+          query = query.eq("is_active", true);
+        }
+        const { data, error } = await withTimeout(query, 3000);
+        if (!error && data) return data;
+      } catch (e) {}
     }
 
-    // 2. Fallback local JSON file
-    let list = readLocalMechanics();
+    // 2. Ambil dari Supabase Cloud Store (id: 99) - Berfungsi di Vercel Production
+    let list = await readCloudStore();
+
+    // 3. Fallback ke local JSON jika cloud store kosong
+    if (!list || list.length === 0) {
+      list = readLocalMechanics();
+      if (list.length > 0) {
+        writeCloudStore(list).catch(() => {});
+      }
+    }
+
     if (!includeInactive) {
       list = list.filter((m) => m.is_active);
     }
@@ -59,45 +123,49 @@ module.exports = {
   },
 
   getMechanicById: async (id) => {
-    try {
-      const { data, error } = await withTimeout(
-        supabase.from("mechanics").select("*").eq("id", id).single(),
-        2000
-      );
-      if (!error && data) return data;
-    } catch (e) {}
+    const hasTable = await checkDedicatedTable();
+    if (hasTable) {
+      try {
+        const { data, error } = await withTimeout(
+          supabase.from("mechanics").select("*").eq("id", id).single(),
+          2500
+        );
+        if (!error && data) return data;
+      } catch (e) {}
+    }
 
-    const list = readLocalMechanics();
+    let list = await readCloudStore();
+    if (!list) list = readLocalMechanics();
     return list.find((m) => String(m.id) === String(id)) || null;
   },
 
   createMechanic: async (mechanicData) => {
-    // 1. Coba simpan ke Supabase
-    try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from("mechanics")
-          .insert([{
-            name: mechanicData.name,
-            phone: mechanicData.phone || "",
-            commission_rate: Number(mechanicData.commission_rate) || 50,
-            is_active: true,
-          }])
-          .select()
-          .single(),
-        2500
-      );
-      if (!error && data) {
-        // Sinkronisasi ke local backup file
-        const list = readLocalMechanics();
-        list.push(data);
-        writeLocalMechanics(list);
-        return data;
-      }
-    } catch (e) {}
+    const hasTable = await checkDedicatedTable();
+    if (hasTable) {
+      try {
+        const { data, error } = await withTimeout(
+          supabase
+            .from("mechanics")
+            .insert([{
+              name: mechanicData.name,
+              phone: mechanicData.phone || "",
+              commission_rate: Number(mechanicData.commission_rate) || 50,
+              is_active: true,
+            }])
+            .select()
+            .single(),
+          3000
+        );
+        if (!error && data) {
+          return data;
+        }
+      } catch (e) {}
+    }
 
-    // 2. Fallback local JSON
-    const list = readLocalMechanics();
+    // Simpan ke Supabase Cloud Store (id: 99)
+    let list = await readCloudStore();
+    if (!list || list.length === 0) list = readLocalMechanics();
+
     const newId = list.length > 0 ? Math.max(...list.map((m) => Number(m.id) || 0)) + 1 : 1;
     const newRecord = {
       id: newId,
@@ -108,39 +176,39 @@ module.exports = {
       created_at: new Date().toISOString(),
     };
     list.push(newRecord);
+
+    await writeCloudStore(list);
     writeLocalMechanics(list);
     return newRecord;
   },
 
   updateMechanic: async (id, updateData) => {
-    // 1. Coba perbarui di Supabase
-    try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from("mechanics")
-          .update(updateData)
-          .eq("id", id)
-          .select()
-          .single(),
-        2500
-      );
-      if (!error && data) {
-        // Sinkronisasi ke local file
-        const list = readLocalMechanics();
-        const index = list.findIndex((m) => String(m.id) === String(id));
-        if (index !== -1) {
-          list[index] = { ...list[index], ...updateData, updated_at: new Date().toISOString() };
-          writeLocalMechanics(list);
+    const hasTable = await checkDedicatedTable();
+    if (hasTable) {
+      try {
+        const { data, error } = await withTimeout(
+          supabase
+            .from("mechanics")
+            .update(updateData)
+            .eq("id", id)
+            .select()
+            .single(),
+          3000
+        );
+        if (!error && data) {
+          return data;
         }
-        return data;
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
 
-    // 2. Fallback local file
-    const list = readLocalMechanics();
+    // Perbarui di Supabase Cloud Store (id: 99)
+    let list = await readCloudStore();
+    if (!list || list.length === 0) list = readLocalMechanics();
+
     const index = list.findIndex((m) => String(m.id) === String(id));
     if (index !== -1) {
       list[index] = { ...list[index], ...updateData, updated_at: new Date().toISOString() };
+      await writeCloudStore(list);
       writeLocalMechanics(list);
       return list[index];
     }
@@ -148,35 +216,31 @@ module.exports = {
   },
 
   deleteMechanic: async (id) => {
-    // 1. Coba hapus permanen dari Supabase
-    let deletedSupabase = null;
-    try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from("mechanics")
-          .delete()
-          .eq("id", id)
-          .select()
-          .single(),
-        2500
-      );
-      if (!error && data) {
-        deletedSupabase = data;
-      }
-    } catch (e) {
-      console.warn("Gagal delete mekanik di Supabase:", e?.message);
+    const hasTable = await checkDedicatedTable();
+    if (hasTable) {
+      try {
+        const { data, error } = await withTimeout(
+          supabase.from("mechanics").delete().eq("id", id).select().single(),
+          3000
+        );
+        if (!error && data) {
+          return data;
+        }
+      } catch (e) {}
     }
 
-    // 2. Selalu bersihkan juga dari local JSON file
-    const list = readLocalMechanics();
+    // Hapus dari Supabase Cloud Store (id: 99)
+    let list = await readCloudStore();
+    if (!list || list.length === 0) list = readLocalMechanics();
+
     const index = list.findIndex((m) => String(m.id) === String(id));
     if (index !== -1) {
       const removed = list.splice(index, 1);
+      await writeCloudStore(list);
       writeLocalMechanics(list);
-      return deletedSupabase || removed[0];
+      return removed[0];
     }
-
-    return deletedSupabase;
+    return null;
   },
 
   // Rekap Jasa Bulanan per Mekanik
@@ -216,15 +280,8 @@ module.exports = {
       console.warn("Gagal mengambil transaksi Supabase untuk rekap mekanik:", e?.message);
     }
 
-    // Ambil daftar mekanik untuk base rate & daftar nama
-    let mechanicsList = [];
-    try {
-      const { data } = await withTimeout(supabase.from("mechanics").select("*"), 2000);
-      if (data && data.length > 0) mechanicsList = data;
-      else mechanicsList = readLocalMechanics();
-    } catch (e) {
-      mechanicsList = readLocalMechanics();
-    }
+    // Ambil daftar mekanik
+    let mechanicsList = await module.exports.getAllMechanics(true);
 
     const mechanicMap = {};
     for (const m of mechanicsList) {
