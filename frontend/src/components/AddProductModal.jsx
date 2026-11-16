@@ -159,6 +159,7 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
         await api.post('/products', payload);
       }
 
+      window.dispatchEvent(new CustomEvent('sinarracing:product_updated'));
       onSuccess();
       onClose();
     } catch (err) {

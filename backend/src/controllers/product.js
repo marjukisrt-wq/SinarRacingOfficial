@@ -195,6 +195,25 @@ module.exports = {
     }
   },
 
+  getProductByBarcode: async (request, response) => {
+    try {
+      const { code } = request.params;
+      if (!code || !code.trim()) {
+        return wrapper.response(response, 400, "Kode barcode tidak boleh kosong", null);
+      }
+
+      const result = await productModel.getProductBySku(code.trim());
+      if (!result || !result.data) {
+        return wrapper.response(response, 404, "Barang dengan barcode tersebut tidak ditemukan", null);
+      }
+
+      return wrapper.response(response, 200, "Berhasil menemukan barang dari barcode", result.data);
+    } catch (error) {
+      console.error("Gagal getProductByBarcode:", error);
+      return wrapper.response(response, 500, "Gagal memproses pencarian barcode", null);
+    }
+  },
+
   createProduct: async (request, response) => {
     try {
       const {

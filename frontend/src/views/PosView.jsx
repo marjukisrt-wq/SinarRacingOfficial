@@ -53,8 +53,10 @@ import {
 
 export const PosView = () => {
   const [products, setProducts] = useState([]);
+  const [allCatalogProducts, setAllCatalogProducts] = useState(() => getCachedCatalog() || []);
   const [brands, setBrands] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('ALL');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -169,7 +171,16 @@ export const PosView = () => {
     }
   };
 
+  // Debounce search input untuk mempercepat pengetikan & scan barcode scanner USB
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    fetchAllCatalog();
     fetchBrands();
     fetchStoreSettings();
     fetchDrafts();
@@ -178,6 +189,7 @@ export const PosView = () => {
     // Inisialisasi Auto Offline Sync
     const cleanupSync = initOfflineSync(api, (msg) => {
       alert(msg);
+      fetchAllCatalog();
       fetchProducts();
       fetchDrafts();
     });
@@ -190,9 +202,15 @@ export const PosView = () => {
       setOfflineCount(e.detail?.count ?? getOfflineQueue().length);
     };
 
+    const handleProductUpdated = () => {
+      fetchAllCatalog();
+      fetchProducts();
+    };
+
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     window.addEventListener('sinarracing:offline_queue_updated', handleOfflineQueueUpdate);
+    window.addEventListener('sinarracing:product_updated', handleProductUpdated);
 
     // Polling antrean draft setiap 12 detik agar laptop owner & kasir selalu sinkron
     const interval = setInterval(fetchDrafts, 12000);
@@ -224,10 +242,24 @@ export const PosView = () => {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
       window.removeEventListener('sinarracing:offline_queue_updated', handleOfflineQueueUpdate);
+      window.removeEventListener('sinarracing:product_updated', handleProductUpdated);
       window.removeEventListener('sinarracing_load_draft', handleCustomLoadDraft);
       window.removeEventListener('monesca_load_draft', handleCustomLoadDraft);
     };
   }, []);
+
+  const fetchAllCatalog = async () => {
+    try {
+      const res = await api.get('/products', { params: { limit: 500 } });
+      const fullList = res.data?.data || [];
+      if (fullList.length > 0) {
+        setAllCatalogProducts(fullList);
+        saveCatalogCache(fullList);
+      }
+    } catch (e) {
+      console.warn('Gagal fetchAllCatalog:', e);
+    }
+  };
 
   useEffect(() => {
     fetchProducts();
@@ -254,7 +286,7 @@ export const PosView = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params = { limit: 150 };
       if (search.trim()) params.search = search.trim();
 
       if (selectedBrand === 'SERVICE') {
@@ -1436,8 +1468,8 @@ export const PosView = () => {
                 type="text"
                 className="search-input"
                 placeholder="Cari part/motor (misal: 'kampas vario', 'oli mpx', 'roller beat')..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
 
@@ -1887,7 +1919,7 @@ export const PosView = () => {
         isOpen={scannerOpen}
         onClose={() => setScannerOpen(false)}
         mode={scannerMode}
-        products={products}
+        products={allCatalogProducts && allCatalogProducts.length > 0 ? allCatalogProducts : products}
         onAddToCart={addToCart}
       />
     </div>

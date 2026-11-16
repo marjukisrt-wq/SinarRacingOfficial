@@ -1,5 +1,51 @@
 const supabase = require("../config/supabase");
 
+const normalizeCode = (str) => {
+  if (!str) return "";
+  return String(str).toUpperCase().replace(/[^A-Z0-9]/g, "");
+};
+
+const findBestMatch = (targetCode, productList = []) => {
+  if (!targetCode || !productList || productList.length === 0) return null;
+  const rawTarget = targetCode.trim();
+  const normTarget = normalizeCode(rawTarget);
+
+  let bestProduct = null;
+  let highestScore = 0;
+
+  for (const p of productList) {
+    const rawSku = (p.sku || "").trim();
+    const normSku = normalizeCode(rawSku);
+    const normName = normalizeCode(p.name);
+    let score = 0;
+
+    if (String(p.id).toLowerCase() === rawTarget.toLowerCase()) {
+      score = 100;
+    } else if (rawSku && rawSku.toLowerCase() === rawTarget.toLowerCase()) {
+      score = 99;
+    } else if (normSku && normSku === normTarget) {
+      score = 95;
+    } else if (normTarget.length === 12 && normTarget.endsWith("00") && normTarget.slice(0, 10) === normSku) {
+      score = 90;
+    } else if (normSku.length === 12 && normSku.endsWith("00") && normSku.slice(0, 10) === normTarget) {
+      score = 90;
+    } else if (normSku.length >= 6 && normTarget.length >= 6 && (normSku.startsWith(normTarget) || normTarget.startsWith(normSku))) {
+      score = 75;
+    } else if (normName && normTarget.length >= 4 && normName.includes(normTarget)) {
+      score = 60;
+    } else if (normName && normTarget.length >= 10 && normName.includes(normTarget.slice(0, 8))) {
+      score = 55;
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestProduct = p;
+    }
+  }
+
+  return highestScore >= 50 ? bestProduct : null;
+};
+
 // Helper untuk memperluas pencarian SKU/Barcode OEM (Yamaha, Honda AHM, dll)
 // Barcode Yamaha: 3C1H21003000 -> otomatis cocok dengan 3C1-H2100-30 dan sebaliknya
 const buildSearchOrClause = (searchStr) => {
@@ -136,8 +182,9 @@ module.exports = {
 
   getProductBySku: (sku) =>
     new Promise((resolve, reject) => {
-      // Cari produk dengan SKU persis atau varian OEM Yamaha/Honda
-      const orClause = buildSearchOrClause(sku);
+      if (!sku || !sku.trim()) return resolve({ data: null });
+      const target = sku.trim();
+      const orClause = buildSearchOrClause(target);
       let query = supabase
         .from("products")
         .select(`
@@ -149,14 +196,16 @@ module.exports = {
       if (orClause) {
         query = query.or(orClause);
       } else {
-        query = query.eq("sku", sku);
+        query = query.eq("sku", target);
       }
 
       query
-        .limit(1)
+        .limit(10)
         .then((result) => {
           if (!result.error) {
-            resolve({ data: result.data?.[0] || null });
+            const candidates = result.data || [];
+            const best = findBestMatch(target, candidates);
+            resolve({ data: best || candidates[0] || null });
           } else {
             reject(result);
           }

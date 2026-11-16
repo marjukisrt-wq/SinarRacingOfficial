@@ -22,15 +22,15 @@ import {
 import api from '../utils/api';
 import { getCachedCatalog } from '../utils/offlineSync';
 
-// Format barcode industri otomotif (termasuk Code 39 untuk Yamaha & Honda AHM, serta DataMatrix & Code 128)
+// Format barcode industri otomotif (Code 39 untuk Yamaha & Honda AHM, Code 128, EAN, DataMatrix, QR)
 const formats = [
-  BarcodeFormat.CODE_128,
   BarcodeFormat.CODE_39,
-  BarcodeFormat.CODE_93,
+  BarcodeFormat.CODE_128,
   BarcodeFormat.EAN_13,
   BarcodeFormat.EAN_8,
   BarcodeFormat.DATA_MATRIX,
   BarcodeFormat.QR_CODE,
+  BarcodeFormat.CODE_93,
   BarcodeFormat.UPC_A,
   BarcodeFormat.UPC_E,
   BarcodeFormat.ITF,
@@ -41,46 +41,73 @@ hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
 hints.set(DecodeHintType.TRY_HARDER, true);
 
 // Fungsi normalisasi kode part (menghilangkan strip, spasi, karakter non-alfanumerik)
-const normalizeCode = (str) => {
+export const normalizeCode = (str) => {
   if (!str) return '';
   return String(str).toUpperCase().replace(/[^A-Z0-9]/g, '');
 };
 
-// Cek kecocokan cerdas kode barcode terhadap SKU & Nama Barang (mendukung barcode bawaan Yamaha & Honda)
-export const isBarcodeMatch = (targetCode, productSku, productName) => {
-  if (!targetCode) return false;
-  const rawTarget = targetCode.trim().toLowerCase();
+// Algoritma pencarian cerdas dengan scoring bobot akurasi
+export const findBestProductMatch = (targetCode, productList = []) => {
+  if (!targetCode || !productList || productList.length === 0) return null;
+  const rawTarget = String(targetCode).trim();
   const normTarget = normalizeCode(rawTarget);
 
-  if (productSku) {
-    const rawSku = productSku.trim().toLowerCase();
+  let bestProduct = null;
+  let highestScore = 0;
+
+  for (const p of productList) {
+    if (!p) continue;
+    const rawSku = String(p.sku || '').trim();
     const normSku = normalizeCode(rawSku);
+    const normName = normalizeCode(p.name);
+    let score = 0;
 
-    // Cocok persis
-    if (rawSku === rawTarget || normSku === normTarget) return true;
+    // 1. Cocok ID produk
+    if (String(p.id).toLowerCase() === rawTarget.toLowerCase()) {
+      score = 100;
+    }
+    // 2. Cocok persis SKU asli
+    else if (rawSku && rawSku.toLowerCase() === rawTarget.toLowerCase()) {
+      score = 99;
+    }
+    // 3. Cocok persis SKU setelah normalisasi
+    else if (normSku && normSku === normTarget) {
+      score = 95;
+    }
+    // 4. Barcode OEM Yamaha (12 digit akhiran 00, contoh: 3C1H21003000 vs 3C1-H2100-30 / 3C1H210030)
+    else if (normTarget.length === 12 && normTarget.endsWith('00') && normTarget.slice(0, 10) === normSku) {
+      score = 92;
+    }
+    else if (normSku.length === 12 && normSku.endsWith('00') && normSku.slice(0, 10) === normTarget) {
+      score = 92;
+    }
+    // 5. Awalan SKU cocok (minimal 6 digit karakter identik)
+    else if (normSku.length >= 6 && normTarget.length >= 6 && (normSku.startsWith(normTarget) || normTarget.startsWith(normSku))) {
+      score = 75;
+    }
+    // 6. Nama barang mengandung kode barcode
+    else if (normName && normTarget.length >= 4 && normName.includes(normTarget)) {
+      score = 65;
+    }
+    // 7. Nama barang cocok dengan potongan OEM 8-10 karakter
+    else if (normName && normTarget.length >= 10 && normName.includes(normTarget.slice(0, 8))) {
+      score = 55;
+    }
 
-    // Barcode OEM Yamaha (12 digit, contoh '3C1H21003000' cocok dengan SKU '3C1-H2100-30' atau '3C1H210030')
-    if (normTarget.endsWith('00') && normTarget.slice(0, -2) === normSku) return true;
-    if (normSku.endsWith('00') && normSku.slice(0, -2) === normTarget) return true;
-
-    // Prefiks cocok
-    if (normTarget.length >= 6 && normSku.length >= 6) {
-      if (normTarget.startsWith(normSku) || normSku.startsWith(normTarget)) {
-        return true;
-      }
+    if (score > highestScore) {
+      highestScore = score;
+      bestProduct = p;
     }
   }
 
-  // Cek apakah kode barcode ada di dalam nama barang
-  if (productName) {
-    const cleanName = productName.toLowerCase();
-    const normName = normalizeCode(cleanName);
-    if (normName.includes(normTarget) || (normTarget.length >= 6 && normName.includes(normTarget.slice(0, -2)))) {
-      return true;
-    }
-  }
+  return highestScore >= 50 ? bestProduct : null;
+};
 
-  return false;
+// Cek kecocokan cerdas kode barcode terhadap SKU & Nama Barang (Backward compatible)
+export const isBarcodeMatch = (targetCode, productSku, productName) => {
+  if (!targetCode) return false;
+  const match = findBestProductMatch(targetCode, [{ sku: productSku, name: productName }]);
+  return Boolean(match);
 };
 
 // Format kode barcode Yamaha OEM (contoh: '3C1H21003000' -> '3C1-H2100-30')
@@ -137,28 +164,35 @@ export const BarcodeScannerModal = ({
   // Pencarian produk cerdas
   const lookupProduct = async (code) => {
     if (!code || !code.trim()) return null;
-    const cleanCode = code.trim().toLowerCase();
+    const cleanCode = code.trim();
 
-    // 1. Coba cari di daftar produk lokal (props atau offline cache)
-    const allLocal = (products && products.length > 0) ? products : (getCachedCatalog() || []);
-    let match = allLocal.find((p) => {
-      if (String(p.id).toLowerCase() === cleanCode) return true;
-      if (isBarcodeMatch(cleanCode, p.sku, p.name)) return true;
-      return false;
-    });
+    // 1. Coba cari di daftar produk lokal (props atau offline cache) secara instan (0 ms)
+    const cached = getCachedCatalog() || [];
+    const allLocal = (products && products.length > 0) ? [...products, ...cached] : cached;
+    let match = findBestProductMatch(cleanCode, allLocal);
 
     if (match) return match;
 
-    // 2. Jika tidak ada di daftar lokal (misal kasir sedang memfilter tab merk lain), cari ke server
+    // 2. Jika tidak ada di daftar lokal (misal baru didaftarkan di perangkat lain), cari ke server endpoint barcode cepat
     try {
       setSearchingRemote(true);
-      const res = await api.get('/products', { params: { search: code.trim(), limit: 1 } });
-      const serverProducts = res.data?.data || [];
-      if (serverProducts.length > 0) {
-        return serverProducts[0];
+      const res = await api.get(`/products/barcode/${encodeURIComponent(cleanCode)}`, { timeout: 4000 });
+      const foundProduct = res.data?.data;
+      if (foundProduct) {
+        return foundProduct;
       }
     } catch (e) {
-      console.warn('Gagal remote lookup barcode:', e);
+      // Fallback: cari via search query umum
+      try {
+        const res2 = await api.get('/products', { params: { search: cleanCode, limit: 3 } });
+        const serverProducts = res2.data?.data || [];
+        const fallbackMatch = findBestProductMatch(cleanCode, serverProducts);
+        if (fallbackMatch) {
+          return fallbackMatch;
+        }
+      } catch (e2) {
+        console.warn('Gagal remote lookup barcode:', e2);
+      }
     } finally {
       setSearchingRemote(false);
     }
@@ -168,14 +202,16 @@ export const BarcodeScannerModal = ({
 
   const handleBarcodeFound = async (barcodeText) => {
     if (!barcodeText || scanningRef.current) return;
+    const cleanText = String(barcodeText).trim();
+    if (cleanText.length < 3) return; // Abaikan glitch/noise pendek dari frame kamera
+
     scanningRef.current = true;
-    playBeep();
 
     // Mode Khusus: Mengisi Kode Barcode / SKU saat Input Stok Barang Baru
     if (mode === 'CAPTURE_CODE') {
+      playBeep();
       if (onCaptureCode) {
-        // Berikan kode barcode asli (atau format yang dikenali)
-        onCaptureCode(barcodeText.trim());
+        onCaptureCode(cleanText);
       }
       onClose();
       scanningRef.current = false;
@@ -183,9 +219,10 @@ export const BarcodeScannerModal = ({
     }
 
     // Mode Cek Harga / Kasir POS
-    const product = await lookupProduct(barcodeText);
+    const product = await lookupProduct(cleanText);
 
     if (product) {
+      playBeep();
       setScannedResult(product);
       setNotFoundBarcode(null);
 
@@ -194,7 +231,7 @@ export const BarcodeScannerModal = ({
       }
     } else {
       setScannedResult(null);
-      setNotFoundBarcode(barcodeText);
+      setNotFoundBarcode(cleanText);
     }
 
     // Jeda 1.2 detik sebelum scan berikutnya
@@ -237,35 +274,43 @@ export const BarcodeScannerModal = ({
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       let frameCount = 0;
+      let lastScanTimestamp = 0;
 
-      const tick = () => {
+      const tick = (timestamp) => {
         if (!streamRef.current || !videoRef.current) return;
 
         const video = videoRef.current;
         if (video.readyState >= 2 && video.videoWidth > 0 && !scanningRef.current) {
-          frameCount++;
-          try {
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
+          // Batasi pembacaan frame ke ~10 fps (interval 100ms) agar CPU HP tidak panas & video tetap lancar 60fps
+          if (!timestamp || timestamp - lastScanTimestamp >= 100) {
+            lastScanTimestamp = timestamp || Date.now();
+            frameCount++;
+            try {
+              const vw = video.videoWidth;
+              const vh = video.videoHeight;
 
-            // Memfokuskan pembacaan pada kotak merah di tengah (ROI: Region of Interest)
-            // Memaksimalkan ketajaman garis Code 39 pada kemasan motor
-            const isFullScan = frameCount % 4 === 0;
-            const roiW = isFullScan ? vw : Math.min(vw * 0.8, 640);
-            const roiH = isFullScan ? vh : Math.min(vh * 0.45, 320);
-            const sx = isFullScan ? 0 : (vw - roiW) / 2;
-            const sy = isFullScan ? 0 : (vh - roiH) / 2;
+              // Memfokuskan pembacaan pada kotak merah di tengah (ROI: Region of Interest)
+              // Memaksimalkan ketajaman garis Code 39 pada kemasan motor
+              const isFullScan = frameCount % 3 === 0;
+              const roiW = isFullScan ? vw : Math.min(vw * 0.85, 640);
+              const roiH = isFullScan ? vh : Math.min(vh * 0.5, 360);
+              const sx = isFullScan ? 0 : (vw - roiW) / 2;
+              const sy = isFullScan ? 0 : (vh - roiH) / 2;
 
-            canvas.width = roiW;
-            canvas.height = roiH;
-            ctx.drawImage(video, sx, sy, roiW, roiH, 0, 0, roiW, roiH);
+              canvas.width = roiW;
+              canvas.height = roiH;
+              ctx.drawImage(video, sx, sy, roiW, roiH, 0, 0, roiW, roiH);
 
-            const res = decodeCanvasWithZXing(canvas, zxingReader);
-            if (res && res.getText()) {
-              handleBarcodeFound(res.getText());
+              const res = decodeCanvasWithZXing(canvas, zxingReader);
+              if (res && res.getText()) {
+                const scannedStr = res.getText().trim();
+                if (scannedStr.length >= 3) {
+                  handleBarcodeFound(scannedStr);
+                }
+              }
+            } catch (e) {
+              // Frame tidak mengandung barcode
             }
-          } catch (e) {
-            // Normal: frame tidak mengandung barcode yang terbaca
           }
         }
 

@@ -73,7 +73,7 @@ export const InventoryView = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params = { limit: 100 };
+      const params = { limit: 500 };
       if (search.trim()) params.search = search.trim();
       if (selectedBrand) params.brandId = selectedBrand;
       if (selectedCategory) params.categoryId = selectedCategory;
