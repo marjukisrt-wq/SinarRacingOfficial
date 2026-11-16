@@ -437,8 +437,9 @@ export const printViaWebBluetooth = async (transaction, store, options = {}) => 
     for (const item of items) {
       const prefix = item.is_manual ? '[LUAR] ' : (item.is_service ? '[JASA] ' : '');
       let itemName = `${prefix}${item.product_name}`;
-      if (item.is_service && item.mechanic_name) {
-        itemName += ` (${item.mechanic_name})`;
+      const mechName = item.mechanic_name || (item.brand_name && item.brand_name.startsWith('MEK:') ? item.brand_name.replace('MEK:', '').split(/[@#]/)[0].trim() : '');
+      if (item.is_service && mechName) {
+        itemName += ` (${mechName})`;
       }
       text += itemName + '\n';
       const detailLeft = `  ${item.quantity} x ${formatNumber(item.unit_price)}`;
@@ -489,8 +490,9 @@ export const printViaWebBluetooth = async (transaction, store, options = {}) => 
     for (const item of items) {
       const prefix = item.is_manual ? '[LUAR] ' : (item.is_service ? '[JASA] ' : '');
       let itemName = `${prefix}${item.product_name}`;
-      if (item.is_service && item.mechanic_name) {
-        itemName += ` (${item.mechanic_name})`;
+      const mechName = item.mechanic_name || (item.brand_name && item.brand_name.startsWith('MEK:') ? item.brand_name.replace('MEK:', '').split(/[@#]/)[0].trim() : '');
+      if (item.is_service && mechName) {
+        itemName += ` (${mechName})`;
       }
       text += itemName + '\n';
       const detailLeft = `  ${item.quantity} x ${formatNumber(item.unit_price)}`;

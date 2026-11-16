@@ -209,22 +209,25 @@ export const ThermalReceipt = ({ transaction, store, onClose }) => {
           <div className="receipt-divider"></div>
 
           {/* ITEM LIST */}
-          {items.map((it, idx) => (
-            <div key={idx} style={{ marginBottom: '4px' }}>
-              <div className="receipt-bold" style={{ fontSize: '11px' }}>
-                {it.is_manual ? `[LUAR] ${it.product_name}` : (it.is_service ? `[JASA] ${it.product_name}` : it.product_name)}
-              </div>
-              {it.is_service && it.mechanic_name && (
-                <div style={{ fontSize: '9.5px', color: '#555', fontStyle: 'italic', paddingLeft: '4px' }}>
-                  (Mekanik: {it.mechanic_name})
+          {items.map((it, idx) => {
+            const mechName = it.mechanic_name || (it.brand_name && it.brand_name.startsWith('MEK:') ? it.brand_name.replace('MEK:', '').split(/[@#]/)[0].trim() : '');
+            return (
+              <div key={idx} style={{ marginBottom: '4px' }}>
+                <div className="receipt-bold" style={{ fontSize: '11px' }}>
+                  {it.is_manual ? `[LUAR] ${it.product_name}` : (it.is_service ? `[JASA] ${it.product_name}` : it.product_name)}
                 </div>
-              )}
-              <div className="receipt-row" style={{ fontSize: '11px' }}>
-                <span>  {it.quantity} x {formatNumber(it.unit_price)}</span>
-                <span>{formatNumber(it.subtotal)}</span>
+                {it.is_service && mechName && (
+                  <div style={{ fontSize: '9.5px', color: '#555', fontStyle: 'italic', paddingLeft: '4px' }}>
+                    (Mekanik: {mechName})
+                  </div>
+                )}
+                <div className="receipt-row" style={{ fontSize: '11px' }}>
+                  <span>  {it.quantity} x {formatNumber(it.unit_price)}</span>
+                  <span>{formatNumber(it.subtotal)}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           <div className="receipt-divider"></div>
 

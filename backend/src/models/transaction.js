@@ -1,12 +1,22 @@
 const supabase = require("../config/supabase");
 
-// Helper untuk menormalisasi item transaksi agar nama mekanik selalu terbaca
+// Helper untuk menormalisasi item transaksi agar nama mekanik & komisi selalu terbaca
 const normalizeItems = (items) => {
   if (!Array.isArray(items)) return items;
   return items.map((it) => {
-    if (it && it.is_service && !it.mechanic_name && it.brand_name && it.brand_name.startsWith("MEK:")) {
+    if (it && it.is_service && it.brand_name && it.brand_name.startsWith("MEK:")) {
       const raw = it.brand_name.replace("MEK:", "").trim();
-      it.mechanic_name = raw.split("#")[0].trim();
+      if (raw.includes("@")) {
+        const parts = raw.split("@");
+        if (!it.mechanic_name) it.mechanic_name = parts[0].trim();
+        it.mechanic_commission = Number(parts[1]) || 0;
+      } else if (raw.includes("#")) {
+        const parts = raw.split("#");
+        if (!it.mechanic_name) it.mechanic_name = parts[0].trim();
+        it.mechanic_commission_rate = Number(parts[1]) || 0;
+      } else {
+        if (!it.mechanic_name) it.mechanic_name = raw.trim();
+      }
     }
     return it;
   });
@@ -26,12 +36,13 @@ module.exports = {
     }
 
     // 2. Format & Simpan Seluruh Item (Sparepart + Jasa Servis)
-    // Nama mekanik juga di-backup ke brand_name (MEK:Nama) agar tidak hilang jika kolom mechanic_name belum ada di tabel Supabase
+    // Nama mekanik dan komisi manual (Rp) di-backup ke brand_name (MEK:Nama@Komisi) agar tidak hilang jika kolom mechanic_name belum ada di tabel Supabase
     const itemsToInsert = items.map((item) => {
       const mechName = (item.mechanic_name || "").trim();
+      const mechComm = Number(item.mechanic_commission || 0);
       let brandVal = item.brand_name || null;
       if (item.is_service && mechName) {
-        brandVal = `MEK:${mechName}`;
+        brandVal = `MEK:${mechName}@${mechComm}`;
       }
       return {
         transaction_id: trx.id,
@@ -339,9 +350,10 @@ module.exports = {
 
     const itemsToInsert = items.map((item) => {
       const mechName = (item.mechanic_name || "").trim();
+      const mechComm = Number(item.mechanic_commission || 0);
       let brandVal = item.brand_name || null;
       if (item.is_service && mechName) {
-        brandVal = `MEK:${mechName}`;
+        brandVal = `MEK:${mechName}@${mechComm}`;
       }
       return {
         transaction_id: realId,

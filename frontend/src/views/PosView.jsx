@@ -89,6 +89,7 @@ export const PosView = () => {
   const [manualPrice, setManualPrice] = useState('');
   const [manualQty, setManualQty] = useState(1);
   const [manualIsService, setManualIsService] = useState(false);
+  const [manualCommission, setManualCommission] = useState('');
   const [manualMechanicId, setManualMechanicId] = useState('');
   const [manualMechanicName, setManualMechanicName] = useState('');
   const [manualMechanicIsCustom, setManualMechanicIsCustom] = useState(false);
@@ -361,10 +362,11 @@ export const PosView = () => {
       notes: notes || '',
       items: cart.map((item) => {
         const mechName = (item.mechanic_name || '').trim();
+        const mechComm = Number(item.mechanic_commission || 0);
         return {
           product_id: item.product_id || null,
           product_name: item.product_name,
-          brand_name: (item.is_service && mechName) ? `MEK:${mechName}` : (item.brand_name || null),
+          brand_name: (item.is_service && mechName) ? `MEK:${mechName}@${mechComm}` : (item.brand_name || null),
           is_service: Boolean(item.is_service),
           cost_price: Number(item.cost_price || 0),
           unit_price: Number(item.unit_price || 0),
@@ -372,6 +374,7 @@ export const PosView = () => {
           subtotal: Number(item.subtotal || item.unit_price * item.quantity),
           mechanic_id: item.mechanic_id ? Number(item.mechanic_id) : null,
           mechanic_name: mechName || null,
+          mechanic_commission: mechComm,
         };
       }),
     };
@@ -417,8 +420,19 @@ export const PosView = () => {
 
     const loadedItems = (draft.items || []).map((it) => {
       let mechName = it.mechanic_name || '';
-      if (!mechName && it.brand_name && it.brand_name.startsWith('MEK:')) {
-        mechName = it.brand_name.replace('MEK:', '').split('#')[0].trim();
+      let mechComm = it.mechanic_commission !== undefined ? Number(it.mechanic_commission) : 0;
+      if (it.brand_name && it.brand_name.startsWith('MEK:')) {
+        const raw = it.brand_name.replace('MEK:', '').trim();
+        if (raw.includes('@')) {
+          const parts = raw.split('@');
+          if (!mechName) mechName = parts[0].trim();
+          mechComm = Number(parts[1]) || 0;
+        } else if (raw.includes('#')) {
+          const parts = raw.split('#');
+          if (!mechName) mechName = parts[0].trim();
+        } else {
+          if (!mechName) mechName = raw;
+        }
       }
       return {
         cart_item_id: 'loaded_' + (it.product_id || Math.random().toString(36).slice(2, 7)),
@@ -434,6 +448,7 @@ export const PosView = () => {
         is_manual: !it.product_id,
         mechanic_id: it.mechanic_id || null,
         mechanic_name: mechName || '',
+        mechanic_commission: mechComm,
       };
     });
 
@@ -520,11 +535,13 @@ export const PosView = () => {
         notes: finalNotes,
         items: cart.map((it) => {
           const mechName = (it.mechanic_name || '').trim();
+          const mechComm = Number(it.mechanic_commission || 0);
           return {
             ...it,
-            brand_name: (it.is_service && mechName) ? `MEK:${mechName}` : (it.brand_name || null),
+            brand_name: (it.is_service && mechName) ? `MEK:${mechName}@${mechComm}` : (it.brand_name || null),
             mechanic_id: it.mechanic_id ? Number(it.mechanic_id) : null,
             mechanic_name: mechName || null,
+            mechanic_commission: mechComm,
           };
         }),
       };
@@ -618,6 +635,7 @@ export const PosView = () => {
             is_manual: false,
             mechanic_id: null,
             mechanic_name: '',
+            mechanic_commission: 0,
           },
         ];
       }
@@ -633,6 +651,21 @@ export const PosView = () => {
             ...item,
             mechanic_id: mechanicId,
             mechanic_name: mechanicName,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const updateCartItemCommission = (identifier, commission) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        const match = (item.cart_item_id && item.cart_item_id === identifier) || item.product_id === identifier;
+        if (match) {
+          return {
+            ...item,
+            mechanic_commission: Math.max(0, Number(commission) || 0),
           };
         }
         return item;
@@ -710,6 +743,7 @@ export const PosView = () => {
       is_manual: true,
       mechanic_id: manualMechanicId || null,
       mechanic_name: manualMechanicName || '',
+      mechanic_commission: manualIsService ? (Number(manualCommission) || 0) : 0,
     };
 
     setCart((prev) => [...prev, newItem]);
@@ -717,6 +751,7 @@ export const PosView = () => {
     setManualPrice('');
     setManualQty(1);
     setManualIsService(false);
+    setManualCommission('');
     setManualMechanicId('');
     setManualMechanicName('');
     setShowManualModal(false);
@@ -759,6 +794,7 @@ export const PosView = () => {
               setManualName('');
               setManualPrice('');
               setManualQty(1);
+              setManualCommission('');
               setManualMechanicId('');
               setManualMechanicName('');
               setShowManualModal(true);
@@ -1005,111 +1041,134 @@ export const PosView = () => {
                     )}
                   </div>
                   {item.is_service && (
-                    <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Mekanik:</span>
-                      {customMechanicRows[item.cart_item_id || item.product_id] ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Mekanik:</span>
+                        {customMechanicRows[item.cart_item_id || item.product_id] ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <input
+                              type="text"
+                              placeholder="Ketik nama mekanik..."
+                              value={item.mechanic_name || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCartItemMechanic(item.cart_item_id || item.product_id, null, val);
+                              }}
+                              style={{
+                                background: '#090d16',
+                                border: '1px solid #3b82f6',
+                                borderRadius: '4px',
+                                color: '#60a5fa',
+                                fontSize: '0.72rem',
+                                padding: '2px 6px',
+                                width: '120px',
+                                outline: 'none',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setCustomMechanicRows(prev => ({ ...prev, [item.cart_item_id || item.product_id]: false }))}
+                              style={{
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                color: '#94a3b8',
+                                borderRadius: '4px',
+                                padding: '2px 5px',
+                                fontSize: '0.68rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                              title="Kembali pilih dari daftar"
+                            >
+                              <IoListOutline size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <select
+                              value={item.mechanic_name || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '__CUSTOM__') {
+                                  setCustomMechanicRows(prev => ({ ...prev, [item.cart_item_id || item.product_id]: true }));
+                                } else {
+                                  const found = mechanics.find(m => m.name === val);
+                                  updateCartItemMechanic(item.cart_item_id || item.product_id, found ? found.id : null, val);
+                                }
+                              }}
+                              style={{
+                                background: '#090d16',
+                                border: '1px solid #334155',
+                                borderRadius: '4px',
+                                color: item.mechanic_name ? '#facc15' : '#94a3b8',
+                                fontSize: '0.72rem',
+                                padding: '2px 5px',
+                                outline: 'none',
+                              }}
+                            >
+                              <option value="">-- Pilih Mekanik --</option>
+                              {mechanics.filter(m => m.is_active).map(m => (
+                                <option key={m.id} value={m.name}>{m.name}</option>
+                              ))}
+                              <option value="__CUSTOM__">+ Ketik Manual...</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setCustomMechanicRows(prev => ({ ...prev, [item.cart_item_id || item.product_id]: true }))}
+                              style={{
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                color: '#94a3b8',
+                                borderRadius: '4px',
+                                padding: '2px 5px',
+                                fontSize: '0.68rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}
+                              title="Ketik nama mekanik manual"
+                            >
+                              <IoPencilOutline size={11} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Input Komisi Manual Rupiah */}
+                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.72rem' }}>
+                        <span style={{ color: '#94a3b8' }}>Komisi:</span>
+                        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                          <span style={{ position: 'absolute', left: '5px', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, pointerEvents: 'none' }}>Rp</span>
                           <input
                             type="text"
-                            placeholder="Ketik nama mekanik..."
-                            value={item.mechanic_name || ''}
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={item.mechanic_commission !== undefined && item.mechanic_commission !== null ? formatRupiahInput(item.mechanic_commission) : ''}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              updateCartItemMechanic(item.cart_item_id || item.product_id, null, val);
+                              const rawVal = parseRupiahInput(e.target.value);
+                              updateCartItemCommission(item.cart_item_id || item.product_id, rawVal);
                             }}
                             style={{
-                              background: '#090d16',
-                              border: '1px solid #3b82f6',
-                              borderRadius: '4px',
-                              color: '#60a5fa',
+                              width: '90px',
+                              padding: '2px 5px 2px 22px',
                               fontSize: '0.72rem',
-                              padding: '2px 6px',
-                              width: '120px',
+                              background: '#090d16',
+                              border: '1px solid #334155',
+                              borderRadius: '4px',
+                              color: '#4ade80',
+                              fontWeight: 700,
                               outline: 'none',
+                              fontFamily: 'var(--font-mono)'
                             }}
+                            title="Ketik nominal komisi untuk mekanik (Rp)"
                           />
-                          <button
-                            type="button"
-                            onClick={() => setCustomMechanicRows(prev => ({ ...prev, [item.cart_item_id || item.product_id]: false }))}
-                            style={{
-                              background: '#1e293b',
-                              border: '1px solid #334155',
-                              color: '#94a3b8',
-                              borderRadius: '4px',
-                              padding: '2px 5px',
-                              fontSize: '0.68rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            title="Kembali pilih dari daftar"
-                          >
-                            <IoListOutline size={12} />
-                          </button>
                         </div>
-                      ) : (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <select
-                            value={item.mechanic_name || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === '__CUSTOM__') {
-                                setCustomMechanicRows(prev => ({ ...prev, [item.cart_item_id || item.product_id]: true }));
-                              } else {
-                                const found = mechanics.find(m => m.name === val);
-                                updateCartItemMechanic(item.cart_item_id || item.product_id, found ? found.id : null, val);
-                              }
-                            }}
-                            style={{
-                              background: '#090d16',
-                              border: '1px solid #334155',
-                              borderRadius: '4px',
-                              color: item.mechanic_name ? '#facc15' : '#94a3b8',
-                              fontSize: '0.72rem',
-                              padding: '2px 5px',
-                              outline: 'none',
-                            }}
-                          >
-                            <option value="">-- Pilih Mekanik --</option>
-                            {mechanics.filter(m => m.is_active).map(m => (
-                              <option key={m.id} value={m.name}>{m.name}</option>
-                            ))}
-                            <option value="__CUSTOM__">+ Ketik Manual...</option>
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => setCustomMechanicRows(prev => ({ ...prev, [item.cart_item_id || item.product_id]: true }))}
-                            style={{
-                              background: '#1e293b',
-                              border: '1px solid #334155',
-                              color: '#94a3b8',
-                              borderRadius: '4px',
-                              padding: '2px 5px',
-                              fontSize: '0.68rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            title="Ketik nama mekanik manual"
-                          >
-                            <IoPencilOutline size={11} />
-                          </button>
-                        </div>
-                      )}
-
-                      {item.mechanic_name && (
-                        <span style={{
-                          fontSize: '0.67rem',
-                          color: '#4ade80',
-                          fontWeight: 700,
-                          background: 'rgba(74, 222, 128, 0.1)',
-                          padding: '1px 5px',
-                          borderRadius: '4px',
-                          border: '1px solid rgba(74, 222, 128, 0.25)'
-                        }}>
-                          Hak: Rp {formatNumber(Math.round((item.subtotal || item.unit_price) * 0.5))}
+                        <span style={{ color: '#64748b', fontSize: '0.68rem' }}>• Hak Bengkel:</span>
+                        <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
+                          Rp {formatNumber(Math.max(0, (item.subtotal || item.unit_price) - (item.mechanic_commission || 0)))}
                         </span>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1521,6 +1580,7 @@ export const PosView = () => {
                 setManualName('');
                 setManualPrice('');
                 setManualQty(1);
+                setManualCommission('');
                 setManualMechanicId('');
                 setManualMechanicName('');
                 setShowManualModal(true);
@@ -2155,23 +2215,48 @@ export const PosView = () => {
                     </select>
                   )}
 
+                  {manualIsService && (
+                    <div style={{ marginTop: '0.85rem' }}>
+                      <label className="form-label">Komisi Mekanik (Rp - Bebas Input)</label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="form-input"
+                          style={{ paddingLeft: '28px', color: '#4ade80', fontWeight: 700, fontFamily: 'var(--font-mono)' }}
+                          placeholder="0"
+                          value={manualCommission ? formatRupiahInput(manualCommission) : ''}
+                          onChange={(e) => setManualCommission(parseRupiahInput(e.target.value))}
+                        />
+                        <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#4ade80', fontWeight: 700, pointerEvents: 'none' }}>
+                          Rp
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {manualPrice > 0 && (
                     <div style={{
-                      marginTop: '0.45rem',
+                      marginTop: '0.65rem',
                       background: 'rgba(56, 189, 248, 0.08)',
                       border: '1px solid rgba(56, 189, 248, 0.2)',
                       borderRadius: '6px',
-                      padding: '6px 8px',
-                      fontSize: '0.73rem',
+                      padding: '8px 10px',
+                      fontSize: '0.75rem',
                       color: '#94a3b8'
                     }}>
-                      {manualMechanicName ? (
-                        <span>
-                          Estimasi Komisi Mekanik: <strong style={{ color: '#4ade80' }}>Rp {formatNumber(Math.round(manualPrice * 0.5))}</strong> (50%) • Hak Bengkel: <strong style={{ color: '#38bdf8' }}>Rp {formatNumber(Math.round(manualPrice * 0.5))}</strong>
-                        </span>
-                      ) : (
-                        <span>Pemberian nama mekanik akan otomatis tersinkron ke Rekap Jasa Mekanik.</span>
-                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                        <span>Tarif Jasa:</span>
+                        <strong style={{ color: '#facc15', fontFamily: 'var(--font-mono)' }}>Rp {formatNumber(manualPrice)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                        <span>Komisi Mekanik:</span>
+                        <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>Rp {formatNumber(Number(manualCommission) || 0)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '3px', marginTop: '3px' }}>
+                        <span>Hak / Kas Bengkel:</span>
+                        <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>Rp {formatNumber(Math.max(0, manualPrice - (Number(manualCommission) || 0)))}</strong>
+                      </div>
                     </div>
                   )}
                 </div>

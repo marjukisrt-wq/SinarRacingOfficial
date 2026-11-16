@@ -325,17 +325,25 @@ module.exports = {
         totalWorkshopServiceOmset += servicePrice;
         totalWorkshopServiceCount += Number(item.quantity || 1);
 
-        // Ambil nama mekanik: prioritaskan item.mechanic_name, lalu fallback ke brand_name (MEK:Nama)
+        // Ambil nama mekanik & komisi manual: prioritaskan item.mechanic_name dan brand_name (MEK:Nama@Komisi)
         let mechName = (item.mechanic_name || "").trim();
+        let manualCommission = (item.mechanic_commission !== undefined && item.mechanic_commission !== null) ? Number(item.mechanic_commission) : null;
         let customRate = null;
-        if (!mechName && item.brand_name && item.brand_name.startsWith("MEK:")) {
+
+        if (item.brand_name && item.brand_name.startsWith("MEK:")) {
           const rawMek = item.brand_name.replace("MEK:", "").trim();
-          if (rawMek.includes("#")) {
+          if (rawMek.includes("@")) {
+            const parts = rawMek.split("@");
+            if (!mechName) mechName = parts[0].trim();
+            if (manualCommission === null || manualCommission === undefined) {
+              manualCommission = Number(parts[1]) || 0;
+            }
+          } else if (rawMek.includes("#")) {
             const parts = rawMek.split("#");
-            mechName = parts[0].trim();
+            if (!mechName) mechName = parts[0].trim();
             customRate = Number(parts[1]) || null;
           } else {
-            mechName = rawMek;
+            if (!mechName) mechName = rawMek;
           }
         }
 
@@ -357,8 +365,15 @@ module.exports = {
         }
 
         const mObj = mechanicMap[key];
-        const commRate = customRate !== null ? customRate : (mObj.commission_rate !== undefined ? mObj.commission_rate : 50);
-        const commissionAmount = Math.round((servicePrice * commRate) / 100);
+        let commissionAmount = 0;
+        if (manualCommission !== null && !isNaN(manualCommission)) {
+          // Komisi diinput manual dalam Rupiah (Rp)
+          commissionAmount = manualCommission;
+        } else {
+          // Fallback ke persentase default hanya jika komisi manual belum diset
+          const commRate = customRate !== null ? customRate : (mObj.commission_rate !== undefined ? mObj.commission_rate : 50);
+          commissionAmount = Math.round((servicePrice * commRate) / 100);
+        }
         const workshopShare = servicePrice - commissionAmount;
 
         mObj.total_services += Number(item.quantity || 1);
@@ -376,7 +391,6 @@ module.exports = {
           quantity: item.quantity,
           price: item.unit_price,
           subtotal: servicePrice,
-          rate_percent: commRate,
           commission: commissionAmount,
           workshop_share: workshopShare,
         });
@@ -411,6 +425,7 @@ module.exports = {
     const rand = Math.floor(1000 + Math.random() * 9000);
     const invoiceNumber = `MAN-${dateStr}-${rand}`;
     const price = Number(jobData.price) || 0;
+    const commission = Number(jobData.commission || 0);
     const mechName = (jobData.mechanic_name || "").trim();
 
     const trxPayload = {
@@ -437,7 +452,8 @@ module.exports = {
         quantity: 1,
         subtotal: price,
         mechanic_name: mechName,
-        brand_name: mechName ? `MEK:${mechName}` : "JASA",
+        mechanic_commission: commission,
+        brand_name: mechName ? `MEK:${mechName}@${commission}` : "JASA",
       },
     ];
 

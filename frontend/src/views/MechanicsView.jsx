@@ -68,6 +68,7 @@ export const MechanicsView = () => {
     vehicle_plate: '',
     vehicle_model: '',
     price: 0,
+    commission: 0,
     date: new Date().toISOString().slice(0, 10),
     notes: '',
   });
@@ -190,6 +191,7 @@ export const MechanicsView = () => {
       vehicle_plate: '',
       vehicle_model: '',
       price: 0,
+      commission: 0,
       date: new Date().toISOString().slice(0, 10),
       notes: '',
     });
@@ -221,6 +223,7 @@ export const MechanicsView = () => {
         vehicle_plate: manualJobForm.vehicle_plate.trim().toUpperCase(),
         vehicle_model: manualJobForm.vehicle_model.trim(),
         price: numPrice,
+        commission: Number(manualJobForm.commission) || 0,
         date: manualJobForm.date,
         notes: manualJobForm.notes.trim(),
       });
@@ -292,7 +295,7 @@ export const MechanicsView = () => {
           <div>
             <div><strong>Nama Mekanik:</strong> ${m.name}</div>
             <div><strong>No Kontak:</strong> ${m.phone || '-'}</div>
-            <div><strong>Rate Komisi:</strong> ${m.commission_rate || 50}%</div>
+            <div><strong>Sistem Komisi:</strong> Nominal Manual (Rp) / Fleksibel</div>
           </div>
           <div style="text-align: right;">
             <div><strong>Periode:</strong> Bulan ${recapData?.period || selectedMonth}</div>
@@ -604,7 +607,7 @@ export const MechanicsView = () => {
                     <tr style={{ background: '#0b1120', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       <th style={{ padding: '0.85rem 1rem' }}>Mekanik</th>
                       <th style={{ padding: '0.85rem 1rem' }}>No Kontak</th>
-                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Rate Komisi</th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Sistem Komisi</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Jml Pekerjaan</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Total Jasa (Rp)</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Hak Komisi (Rp)</th>
@@ -630,7 +633,7 @@ export const MechanicsView = () => {
                             fontWeight: 700,
                             fontSize: '0.75rem',
                           }}>
-                            {m.commission_rate}%
+                            Manual (Rp)
                           </span>
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center', fontWeight: 700, color: '#facc15' }}>
@@ -761,7 +764,7 @@ export const MechanicsView = () => {
                 <tr style={{ background: '#0b1120', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.75rem', textTransform: 'uppercase' }}>
                   <th style={{ padding: '0.85rem 1rem' }}>Nama Mekanik</th>
                   <th style={{ padding: '0.85rem 1rem' }}>No WhatsApp / Telepon</th>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Bagi Hasil Jasa</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Sistem Komisi</th>
                   <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Aksi</th>
                 </tr>
@@ -784,7 +787,7 @@ export const MechanicsView = () => {
                         fontWeight: 700,
                         fontSize: '0.75rem',
                       }}>
-                        {m.commission_rate || 50}%
+                        Manual (Rp) / Bebas
                       </span>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
@@ -946,7 +949,7 @@ export const MechanicsView = () => {
                   required
                 />
                 <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                  Standar bengkel biasanya 50% untuk mekanik dan 50% untuk bengkel.
+                  Persentase acuan awal. Pada saat transaksi di kasir POS atau input jasa, komisi dapat langsung diisi nominal Rupiah (Rp) secara bebas tanpa terikat persen.
                 </span>
               </div>
 
@@ -1244,7 +1247,7 @@ export const MechanicsView = () => {
                   >
                     <option value="">-- Pilih Mekanik --</option>
                     {mechanics.filter(m => m.is_active).map(m => (
-                      <option key={m.id} value={m.name}>{m.name} ({m.commission_rate || 50}%)</option>
+                      <option key={m.id} value={m.name}>{m.name}</option>
                     ))}
                     <option value="__CUSTOM__">+ Ketik Nama Manual...</option>
                   </select>
@@ -1264,8 +1267,8 @@ export const MechanicsView = () => {
                 />
               </div>
 
-              {/* Tarif & Tanggal */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+              {/* Tarif, Komisi & Tanggal */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Tarif Jasa (Rp) <span style={{ color: '#ef4444' }}>*</span></label>
                   <div style={{ position: 'relative' }}>
@@ -1286,15 +1289,34 @@ export const MechanicsView = () => {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Tanggal</label>
-                  <input
-                    type="date"
-                    className="form-input"
-                    value={manualJobForm.date}
-                    onChange={(e) => setManualJobForm(prev => ({ ...prev, date: e.target.value }))}
-                    required
-                  />
+                  <label className="form-label">Komisi Mekanik (Rp)</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="form-input"
+                      style={{ paddingLeft: '28px', fontFamily: 'var(--font-mono)', color: '#4ade80' }}
+                      placeholder="0"
+                      value={manualJobForm.commission !== undefined && manualJobForm.commission !== null && manualJobForm.commission !== '' ? formatRupiahInput(manualJobForm.commission) : ''}
+                      onChange={(e) => setManualJobForm(prev => ({ ...prev, commission: parseRupiahInput(e.target.value) }))}
+                    />
+                    <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#4ade80', fontWeight: 700, pointerEvents: 'none' }}>
+                      Rp
+                    </span>
+                  </div>
                 </div>
+              </div>
+
+              {/* Tanggal */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Tanggal Pengerjaan</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={manualJobForm.date}
+                  onChange={(e) => setManualJobForm(prev => ({ ...prev, date: e.target.value }))}
+                  required
+                />
               </div>
 
               {/* Motor & Plat */}
@@ -1333,15 +1355,21 @@ export const MechanicsView = () => {
                   fontSize: '0.78rem',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: '#94a3b8' }}>Hak Komisi Mekanik (50%):</span>
-                    <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
-                      Rp {Number(Math.round(Number(manualJobForm.price) * 0.5)).toLocaleString('id-ID')}
+                    <span style={{ color: '#94a3b8' }}>Tarif Jasa:</span>
+                    <strong style={{ color: '#facc15', fontFamily: 'var(--font-mono)' }}>
+                      Rp {Number(manualJobForm.price).toLocaleString('id-ID')}
                     </strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>Bagian Kas Bengkel (50%):</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: '#94a3b8' }}>Hak Komisi Mekanik:</span>
+                    <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
+                      Rp {Number(manualJobForm.commission || 0).toLocaleString('id-ID')}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '4px', marginTop: '4px' }}>
+                    <span style={{ color: '#94a3b8' }}>Bagian Kas Bengkel:</span>
                     <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
-                      Rp {Number(Math.round(Number(manualJobForm.price) * 0.5)).toLocaleString('id-ID')}
+                      Rp {Math.max(0, Number(manualJobForm.price) - Number(manualJobForm.commission || 0)).toLocaleString('id-ID')}
                     </strong>
                   </div>
                 </div>
