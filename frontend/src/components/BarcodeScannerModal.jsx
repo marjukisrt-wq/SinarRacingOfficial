@@ -11,6 +11,25 @@ import {
   IoBarcodeOutline,
   IoRefreshOutline,
 } from 'react-icons/io5';
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
+
+// Inisialisasi format barcode yang didukung (termasuk Code 39 untuk Yamaha/Honda part & DataMatrix)
+const supportedFormats = [
+  BarcodeFormat.CODE_128,
+  BarcodeFormat.CODE_39,
+  BarcodeFormat.EAN_13,
+  BarcodeFormat.EAN_8,
+  BarcodeFormat.UPC_A,
+  BarcodeFormat.UPC_E,
+  BarcodeFormat.DATA_MATRIX,
+  BarcodeFormat.QR_CODE,
+  BarcodeFormat.ITF,
+  BarcodeFormat.CODABAR,
+];
+
+const hints = new Map();
+hints.set(DecodeHintType.POSSIBLE_FORMATS, supportedFormats);
+hints.set(DecodeHintType.TRY_HARDER, true);
 
 // Fungsi bantuan untuk bunyi BEEP kasir saat scan berhasil (menggunakan Web Audio API tanpa perlu file mp3)
 const playBeep = () => {
@@ -49,6 +68,7 @@ export const BarcodeScannerModal = ({
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const codeReaderRef = useRef(null);
   const scanningRef = useRef(false);
 
   // Cari produk berdasarkan SKU / Barcode atau Nama
@@ -69,7 +89,7 @@ export const BarcodeScannerModal = ({
     scanningRef.current = true;
     playBeep();
 
-    // Mode Khusus: Mengisi Kode Barcode / SKU saat Input Stok
+    // Mode Khusus: Mengisi Kode Barcode / SKU saat Input Stok Barang
     if (mode === 'CAPTURE_CODE') {
       if (onCaptureCode) {
         onCaptureCode(barcodeText);
@@ -100,41 +120,72 @@ export const BarcodeScannerModal = ({
     }, 1200);
   };
 
-  // Deteksi Barcode dari Foto / Gambar Kemasan
+  // Deteksi Barcode dari Foto / Gambar Kemasan (Kompatibel dengan iOS Safari & Android)
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      if (!('BarcodeDetector' in window)) {
-        alert('Fitur deteksi barcode dari foto memerlukan browser modern (Chrome/Edge/Safari terbaru). Gunakan kamera live atau input manual jika belum didukung.');
-        return;
-      }
-
+      const reader = new BrowserMultiFormatReader(hints);
+      const fileUrl = URL.createObjectURL(file);
       const img = new Image();
-      img.src = URL.createObjectURL(file);
+      img.src = fileUrl;
+
       img.onload = async () => {
+        let detectedText = null;
+
+        // 1. Coba decode langsung dengan ZXing MultiFormat
         try {
-          const detector = new window.BarcodeDetector({
-            formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e'],
-          });
-          const barcodes = await detector.detect(img);
-          if (barcodes.length > 0 && barcodes[0].rawValue) {
-            handleBarcodeFound(barcodes[0].rawValue);
-          } else {
-            alert('Tidak ada barcode yang terdeteksi pada foto ini. Pastikan foto tegak lurus, garis-garis barcode jelas, dan pencahayaan terang.');
+          const res = await reader.decodeFromImageElement(img);
+          if (res && res.getText()) {
+            detectedText = res.getText();
           }
-        } catch (err) {
-          console.error('Gagal deteksi foto:', err);
-          alert('Gagal mendeteksi barcode dari foto: ' + err.message);
+        } catch (e1) {
+          // 2. Coba perjelas kontras lewat canvas jika kemasan plastik silau / berkerut
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            ctx.filter = 'contrast(1.5) grayscale(1)';
+            ctx.drawImage(img, 0, 0);
+
+            const enhancedUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const res2 = await reader.decodeFromImageUrl(enhancedUrl);
+            if (res2 && res2.getText()) {
+              detectedText = res2.getText();
+            }
+          } catch (e2) {}
+
+          // 3. Coba native BarcodeDetector browser jika tersedia
+          if (!detectedText && 'BarcodeDetector' in window) {
+            try {
+              const nativeDetector = new window.BarcodeDetector({
+                formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix'],
+              });
+              const nativeBarcodes = await nativeDetector.detect(img);
+              if (nativeBarcodes.length > 0 && nativeBarcodes[0].rawValue) {
+                detectedText = nativeBarcodes[0].rawValue;
+              }
+            } catch (e3) {}
+          }
+        }
+
+        URL.revokeObjectURL(fileUrl);
+
+        if (detectedText) {
+          handleBarcodeFound(detectedText);
+        } else {
+          alert('Barcode tidak terbaca dari foto. Tips: Pastikan barcode tidak terkena pantulan cahaya lampu yang silau pada plastik. Anda juga bisa langsung mengetik kode part kemasan pada kolom di bawah.');
         }
       };
     } catch (err) {
-      console.error(err);
+      console.error('Gagal deteksi foto:', err);
+      alert('Gagal mendeteksi barcode dari foto: ' + (err.message || 'Error'));
     }
   };
 
-  // Inisialisasi Kamera & Barcode Detector dengan fallback bertahap
+  // Inisialisasi Kamera & Barcode Detector dengan fallback multi-device (iOS Safari, Android Chrome, PC)
   const startCamera = async () => {
     try {
       setCameraError(null);
@@ -179,11 +230,11 @@ export const BarcodeScannerModal = ({
       let message = 'Kamera tidak dapat diakses.';
 
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        message = 'Izin kamera ditolak di browser. Klik ikon di sebelah kiri alamat URL (di samping localhost:5173) lalu ubah opsi "Camera" menjadi "Allow / Izinkan".';
+        message = 'Izin kamera ditolak di browser. Klik ikon gembok / pengaturan situs di alamat URL browser lalu ubah "Camera" menjadi "Allow / Izinkan".';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        message = 'Tidak ada perangkat kamera/webcam yang terdeteksi di komputer ini. Jika menggunakan PC desktop kasir, Anda bisa menggunakan alat Barcode Gun USB atau input manual di bawah. Pada HP Android/iPhone, kamera akan otomatis aktif.';
+        message = 'Tidak ada perangkat kamera/webcam yang terdeteksi. Silakan gunakan input manual atau Barcode Gun USB.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        message = 'Kamera sedang digunakan oleh aplikasi lain (seperti Zoom/OBS/aplikasi kamera Windows).';
+        message = 'Kamera sedang digunakan oleh aplikasi lain (seperti Zoom/kamera bawaan HP).';
       } else if (err.name === 'OverconstrainedError') {
         message = 'Resolusi kamera yang diminta tidak didukung oleh perangkat ini.';
       } else {
@@ -196,6 +247,12 @@ export const BarcodeScannerModal = ({
   };
 
   const stopCamera = () => {
+    if (codeReaderRef.current) {
+      try {
+        codeReaderRef.current.reset();
+      } catch (e) {}
+      codeReaderRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -204,37 +261,51 @@ export const BarcodeScannerModal = ({
     setTorchOn(false);
   };
 
-  // Loop deteksi frame video menggunakan BarcodeDetector API browser
+  // Loop deteksi frame video menggunakan ZXing MultiFormat & BarcodeDetector
   const startScanningLoop = () => {
-    if (!('BarcodeDetector' in window)) {
-      console.info('BarcodeDetector native tidak didukung di browser ini.');
-      return;
+    if (!videoRef.current) return;
+
+    try {
+      const codeReader = new BrowserMultiFormatReader(hints);
+      codeReaderRef.current = codeReader;
+
+      // Scan continuous dari video element (berfungsi di iPhone iOS Safari, Android Chrome, & Desktop)
+      codeReader.decodeFromVideoElementContinuously(videoRef.current, (result, err) => {
+        if (result && result.getText() && !scanningRef.current) {
+          handleBarcodeFound(result.getText());
+        }
+      });
+    } catch (e) {
+      console.warn('Gagal inisialisasi ZXing video loop:', e);
     }
 
-    const detector = new window.BarcodeDetector({
-      formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e'],
-    });
+    // Akselerasi tambahan jika browser mendukung BarcodeDetector native
+    if ('BarcodeDetector' in window) {
+      try {
+        const nativeDetector = new window.BarcodeDetector({
+          formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code'],
+        });
 
-    const loop = async () => {
-      if (!streamRef.current || !videoRef.current) return;
+        const nativeLoop = async () => {
+          if (!streamRef.current || !videoRef.current) return;
 
-      if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && !scanningRef.current) {
-        try {
-          const barcodes = await detector.detect(videoRef.current);
-          if (barcodes.length > 0 && barcodes[0].rawValue) {
-            handleBarcodeFound(barcodes[0].rawValue);
+          if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && !scanningRef.current) {
+            try {
+              const barcodes = await nativeDetector.detect(videoRef.current);
+              if (barcodes.length > 0 && barcodes[0].rawValue) {
+                handleBarcodeFound(barcodes[0].rawValue);
+              }
+            } catch (e) {}
           }
-        } catch (e) {
-          // Frame skip
-        }
-      }
 
-      if (streamRef.current) {
-        requestAnimationFrame(loop);
-      }
-    };
+          if (streamRef.current) {
+            requestAnimationFrame(nativeLoop);
+          }
+        };
 
-    requestAnimationFrame(loop);
+        requestAnimationFrame(nativeLoop);
+      } catch (e) {}
+    }
   };
 
   // Toggle Senter HP jika didukung
@@ -339,7 +410,7 @@ export const BarcodeScannerModal = ({
                 {mode === 'CAPTURE_CODE' ? 'Foto / Scan Barcode Kemasan' : (mode === 'CHECK_PRICE' ? 'Cek Harga Sparepart' : 'Scan Barcode ke Kasir')}
               </h3>
               <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>
-                {mode === 'CAPTURE_CODE' ? 'Arahkan kamera atau unggah foto barcode dari bungkus part' : (mode === 'CHECK_PRICE' ? 'Arahkan kamera ke barcode part motor' : 'Scan barang untuk langsung masuk keranjang kasir')}
+                {mode === 'CAPTURE_CODE' ? 'Arahkan kamera ke barcode bungkus sparepart' : (mode === 'CHECK_PRICE' ? 'Arahkan kamera ke barcode part motor' : 'Scan barang untuk langsung masuk keranjang kasir')}
               </p>
             </div>
           </div>
@@ -381,7 +452,7 @@ export const BarcodeScannerModal = ({
               {/* Target Aiming Box */}
               <div style={{
                 position: 'absolute',
-                width: '230px',
+                width: '240px',
                 height: '140px',
                 border: '2px solid #ef4444',
                 borderRadius: '12px',
@@ -394,12 +465,13 @@ export const BarcodeScannerModal = ({
                 <div style={{
                   width: '90%',
                   height: '2px',
-                  background: 'linear-gradient(90deg, transparent, #facc15, #dc2626, transparent)',
-                  animation: 'scannerLaser 1.8s infinite ease-in-out',
+                  background: '#ef4444',
+                  boxShadow: '0 0 8px #ef4444',
+                  animation: 'pulse 1.5s infinite',
                 }} />
               </div>
 
-              {/* Tombol Flashlight / Senter */}
+              {/* Tombol Senter HP */}
               <button
                 type="button"
                 onClick={toggleTorch}
@@ -407,9 +479,9 @@ export const BarcodeScannerModal = ({
                   position: 'absolute',
                   top: '12px',
                   right: '12px',
-                  background: torchOn ? '#facc15' : 'rgba(15, 23, 42, 0.8)',
+                  background: torchOn ? '#facc15' : 'rgba(15, 23, 42, 0.75)',
                   color: torchOn ? '#0f172a' : '#f8fafc',
-                  border: 'none',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
                   borderRadius: '50%',
                   width: '38px',
                   height: '38px',
@@ -419,7 +491,7 @@ export const BarcodeScannerModal = ({
                   cursor: 'pointer',
                   zIndex: 5,
                 }}
-                title="Lampu Senter"
+                title={torchOn ? 'Matikan Senter' : 'Nyalakan Senter'}
               >
                 {torchOn ? <IoFlashOutline size={20} /> : <IoFlashOffOutline size={20} />}
               </button>
@@ -427,7 +499,7 @@ export const BarcodeScannerModal = ({
           )}
 
           {!cameraActive && (
-            <div style={{ padding: '2rem 1.5rem', textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', zIndex: 1 }}>
               <IoCameraOutline size={48} style={{ color: '#475569', marginBottom: '0.75rem' }} />
               <p style={{ fontSize: '0.85rem', marginBottom: '1rem', color: cameraError ? '#f87171' : '#94a3b8' }}>
                 {cameraError || 'Kamera sedang disiapkan...'}
@@ -459,7 +531,7 @@ export const BarcodeScannerModal = ({
               <IoSearchOutline style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
                 type="text"
-                placeholder="Scan pakai Barcode Gun atau ketik SKU/Kode part..."
+                placeholder={mode === 'CAPTURE_CODE' ? 'Ketik kode part kemasan (contoh: 2PH-E4450)...' : 'Scan Barcode Gun atau ketik SKU part...'}
                 value={manualBarcode}
                 onChange={(e) => setManualBarcode(e.target.value)}
                 style={{
@@ -485,9 +557,10 @@ export const BarcodeScannerModal = ({
                 fontWeight: 600,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
               }}
             >
-              Cek
+              {mode === 'CAPTURE_CODE' ? '✓ Pakai Kode' : 'Cek'}
             </button>
 
             <button
@@ -521,7 +594,21 @@ export const BarcodeScannerModal = ({
             />
           </form>
 
-          {products && products.length > 0 && (
+          {/* Kotak Petunjuk Khusus Sparepart Yamaha / Honda */}
+          <div style={{
+            marginTop: '0.65rem',
+            background: 'rgba(30, 41, 59, 0.7)',
+            border: '1px dashed #334155',
+            borderRadius: '6px',
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.73rem',
+            color: '#94a3b8',
+            lineHeight: 1.4,
+          }}>
+            <strong style={{ color: '#facc15' }}>💡 Info Barcode Resmi Motor:</strong> Barcode Yamaha / AHM menggunakan format industri <em>Code 39/128</em>. Meskipun di bawah garis barcode tidak ada angka (misal bertuliskan <em>MADE IN INDONESIA</em>), garis barcode tetap terbaca. Jika plastik kemasan berkerut atau silau, Anda juga bisa langsung ketik nomor part yang tertera (contoh: <code>2PH-E4450</code>) lalu klik <strong>Pakai Kode</strong>.
+          </div>
+
+          {products && products.length > 0 && mode !== 'CAPTURE_CODE' && (
             <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Coba tes cepat part:</span>
               {products.slice(0, 4).map((p) => (
