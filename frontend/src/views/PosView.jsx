@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { formatCurrency, formatNumber } from '../utils/bluetoothPrinter';
 import { ThermalReceipt } from '../components/ThermalReceipt';
-import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
+import { BarcodeScannerModal, isBarcodeMatch } from '../components/BarcodeScannerModal';
 import {
   initOfflineSync,
   isOnline,
@@ -282,6 +282,7 @@ export const PosView = () => {
           filtered = filtered.filter(p =>
             (p.name || '').toLowerCase().includes(q) ||
             (p.sku || '').toLowerCase().includes(q) ||
+            isBarcodeMatch(q, p.sku, p.name) ||
             (p.motor_compatibility || '').toLowerCase().includes(q)
           );
         }

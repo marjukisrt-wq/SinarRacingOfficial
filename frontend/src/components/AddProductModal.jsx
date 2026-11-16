@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { formatCurrency, formatNumber } from '../utils/bluetoothPrinter';
 import { useAuth } from '../context/AuthContext';
-import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { BarcodeScannerModal, formatYamahaOemCode } from './BarcodeScannerModal';
 import { BarcodeLabelModal } from './BarcodeLabelModal';
 import { 
   IoCloseCircleOutline, 
@@ -732,7 +732,8 @@ export const AddProductModal = ({ productToEdit, brands, categories, onClose, on
         onClose={() => setShowScanBarcodeModal(false)}
         mode="CAPTURE_CODE"
         onCaptureCode={(capturedCode) => {
-          setSku(capturedCode);
+          const formatted = formatYamahaOemCode(capturedCode);
+          setSku(formatted || capturedCode);
           setShowScanBarcodeModal(false);
         }}
       />
