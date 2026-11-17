@@ -89,7 +89,6 @@ export const PosView = () => {
   const [manualPrice, setManualPrice] = useState('');
   const [manualQty, setManualQty] = useState(1);
   const [manualIsService, setManualIsService] = useState(false);
-  const [manualRate, setManualRate] = useState(50);
   const [manualMechanicId, setManualMechanicId] = useState('');
   const [manualMechanicName, setManualMechanicName] = useState('');
   const [manualMechanicIsCustom, setManualMechanicIsCustom] = useState(false);
@@ -659,20 +658,6 @@ export const PosView = () => {
     );
   };
 
-  const updateCartItemRate = (identifier, rate) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        const match = (item.cart_item_id && item.cart_item_id === identifier) || item.product_id === identifier;
-        if (match) {
-          return {
-            ...item,
-            mechanic_rate: Number(rate) || 50,
-          };
-        }
-        return item;
-      })
-    );
-  };
 
   const updateQuantity = (identifier, delta) => {
     setCart((prev) =>
@@ -744,7 +729,14 @@ export const PosView = () => {
       is_manual: true,
       mechanic_id: manualMechanicId || null,
       mechanic_name: manualMechanicName || '',
-      mechanic_rate: manualIsService ? (Number(manualRate) || 50) : 50,
+      mechanic_rate: (() => {
+        if (!manualIsService) return 50;
+        if (manualMechanicName) {
+          const found = mechanics.find((m) => m.name === manualMechanicName);
+          if (found && found.commission_rate !== undefined) return Number(found.commission_rate);
+        }
+        return 50;
+      })(),
     };
 
     setCart((prev) => [...prev, newItem]);
@@ -752,7 +744,6 @@ export const PosView = () => {
     setManualPrice('');
     setManualQty(1);
     setManualIsService(false);
-    setManualRate(50);
     setManualMechanicId('');
     setManualMechanicName('');
     setShowManualModal(false);
@@ -1139,56 +1130,21 @@ export const PosView = () => {
                             </button>
                           </div>
                         )}
+
+                        {item.mechanic_name && (
+                          <span style={{
+                            fontSize: '0.68rem',
+                            color: '#38bdf8',
+                            background: 'rgba(56, 189, 248, 0.1)',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(56, 189, 248, 0.25)',
+                            fontWeight: 600,
+                          }} title="Bagi hasil otomatis sesuai pengaturan admin">
+                            {item.mechanic_rate || 50}%
+                          </span>
+                        )}
                       </div>
-
-                      {/* Pilihan Persen Bagi Hasil Mekanik */}
-                      {(() => {
-                        const rate = Number(item.mechanic_rate || 50);
-                        const itemTotalPrice = (item.subtotal || item.unit_price * item.quantity || 0);
-                        const commAmount = Math.round((itemTotalPrice * rate) / 100);
-                        return (
-                          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem', fontSize: '0.72rem' }}>
-                            <span style={{ color: '#94a3b8' }}>Bagi Hasil:</span>
-                            <select
-                              value={rate}
-                              onChange={(e) => updateCartItemRate(item.cart_item_id || item.product_id, Number(e.target.value))}
-                              style={{
-                                background: '#090d16',
-                                border: '1px solid #334155',
-                                borderRadius: '4px',
-                                color: '#facc15',
-                                fontWeight: 700,
-                                fontSize: '0.72rem',
-                                padding: '2px 5px',
-                                outline: 'none',
-                                cursor: 'pointer'
-                              }}
-                              title="Pilih persentase bagi hasil mekanik"
-                            >
-                              <option value="50">50% (Standar)</option>
-                              <option value="40">40%</option>
-                              <option value="60">60%</option>
-                              <option value="70">70%</option>
-                              <option value="100">100%</option>
-                              <option value="30">30%</option>
-                            </select>
-
-                            {item.mechanic_name && (
-                              <span style={{
-                                fontSize: '0.68rem',
-                                color: '#4ade80',
-                                fontWeight: 700,
-                                background: 'rgba(74, 222, 128, 0.1)',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                border: '1px solid rgba(74, 222, 128, 0.25)'
-                              }}>
-                                Hak: Rp {formatNumber(commAmount)}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()}
                     </div>
                   )}
                 </div>
@@ -2233,54 +2189,6 @@ export const PosView = () => {
                       ))}
                       <option value="__CUSTOM__">+ Ketik Nama Manual...</option>
                     </select>
-                  )}
-
-                  {manualIsService && (
-                    <div style={{ marginTop: '0.85rem' }}>
-                      <label className="form-label">Bagi Hasil Jasa (%)</label>
-                      <select
-                        className="form-input"
-                        value={manualRate}
-                        onChange={(e) => setManualRate(Number(e.target.value))}
-                        style={{ fontSize: '0.82rem' }}
-                      >
-                        <option value="50">50% (Standar Bengkel 50/50)</option>
-                        <option value="40">40% (Mekanik 40%, Bengkel 60%)</option>
-                        <option value="60">60% (Mekanik 60%, Bengkel 40%)</option>
-                        <option value="70">70% (Mekanik 70%, Bengkel 30%)</option>
-                        <option value="100">100% (Mekanik 100%)</option>
-                        <option value="30">30% (Mekanik 30%, Bengkel 70%)</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {manualPrice > 0 && (
-                    <div style={{
-                      marginTop: '0.65rem',
-                      background: 'rgba(56, 189, 248, 0.08)',
-                      border: '1px solid rgba(56, 189, 248, 0.2)',
-                      borderRadius: '6px',
-                      padding: '8px 10px',
-                      fontSize: '0.75rem',
-                      color: '#94a3b8'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                        <span>Tarif Jasa:</span>
-                        <strong style={{ color: '#facc15', fontFamily: 'var(--font-mono)' }}>Rp {formatNumber(manualPrice)}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                        <span>Hak Mekanik ({manualRate}%):</span>
-                        <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
-                          Rp {formatNumber(Math.round(manualPrice * manualRate / 100))}
-                        </strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '3px', marginTop: '3px' }}>
-                        <span>Hak Bengkel ({100 - manualRate}%):</span>
-                        <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
-                          Rp {formatNumber(manualPrice - Math.round(manualPrice * manualRate / 100))}
-                        </strong>
-                      </div>
-                    </div>
                   )}
                 </div>
               )}

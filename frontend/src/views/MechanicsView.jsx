@@ -183,7 +183,11 @@ export const MechanicsView = () => {
 
   const handleOpenManualJobModal = (presetMechanicName = '') => {
     setManualJobError(null);
-    const defaultMech = presetMechanicName || (mechanics.find(m => m.is_active)?.name || '');
+    const defaultMechObj = presetMechanicName 
+      ? mechanics.find(m => m.name === presetMechanicName)
+      : mechanics.find(m => m.is_active);
+    const defaultMech = defaultMechObj?.name || presetMechanicName || '';
+    const defaultRate = defaultMechObj ? (defaultMechObj.commission_rate || 50) : 50;
     setManualJobForm({
       mechanic_name: defaultMech,
       is_custom_mechanic: !defaultMech,
@@ -191,7 +195,7 @@ export const MechanicsView = () => {
       vehicle_plate: '',
       vehicle_model: '',
       price: 0,
-      commission_rate: 50,
+      commission_rate: defaultRate,
       date: new Date().toISOString().slice(0, 10),
       notes: '',
     });
@@ -1244,9 +1248,14 @@ export const MechanicsView = () => {
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === '__CUSTOM__') {
-                        setManualJobForm(prev => ({ ...prev, is_custom_mechanic: true, mechanic_name: '' }));
+                        setManualJobForm(prev => ({ ...prev, is_custom_mechanic: true, mechanic_name: '', commission_rate: 50 }));
                       } else {
-                        setManualJobForm(prev => ({ ...prev, mechanic_name: val }));
+                        const found = mechanics.find(m => m.name === val);
+                        setManualJobForm(prev => ({
+                          ...prev,
+                          mechanic_name: val,
+                          commission_rate: found ? (found.commission_rate || 50) : 50
+                        }));
                       }
                     }}
                     required
@@ -1273,42 +1282,23 @@ export const MechanicsView = () => {
                 />
               </div>
 
-              {/* Tarif, Komisi & Tanggal */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Tarif Jasa (Rp) <span style={{ color: '#ef4444' }}>*</span></label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="form-input"
-                      style={{ paddingLeft: '28px', fontFamily: 'var(--font-mono)' }}
-                      placeholder="0"
-                      value={manualJobForm.price ? formatRupiahInput(manualJobForm.price) : ''}
-                      onChange={(e) => setManualJobForm(prev => ({ ...prev, price: parseRupiahInput(e.target.value) }))}
-                      required
-                    />
-                    <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, pointerEvents: 'none' }}>
-                      Rp
-                    </span>
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label" style={{ margin: 0 }}>Bagi Hasil Jasa (%)</label>
-                  <select
+              {/* Tarif Jasa */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Tarif Jasa (Rp) <span style={{ color: '#ef4444' }}>*</span></label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
                     className="form-input"
-                    style={{ marginTop: '0.25rem', fontSize: '0.82rem', color: '#facc15', fontWeight: 700 }}
-                    value={manualJobForm.commission_rate}
-                    onChange={(e) => setManualJobForm(prev => ({ ...prev, commission_rate: Number(e.target.value) }))}
-                  >
-                    <option value="50">50% (Standar Bengkel 50/50)</option>
-                    <option value="40">40% (Mekanik 40%, Bengkel 60%)</option>
-                    <option value="60">60% (Mekanik 60%, Bengkel 40%)</option>
-                    <option value="70">70% (Mekanik 70%, Bengkel 30%)</option>
-                    <option value="100">100% (Mekanik 100%)</option>
-                    <option value="30">30% (Mekanik 30%, Bengkel 70%)</option>
-                  </select>
+                    style={{ paddingLeft: '28px', fontFamily: 'var(--font-mono)' }}
+                    placeholder="0"
+                    value={manualJobForm.price ? formatRupiahInput(manualJobForm.price) : ''}
+                    onChange={(e) => setManualJobForm(prev => ({ ...prev, price: parseRupiahInput(e.target.value) }))}
+                    required
+                  />
+                  <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, pointerEvents: 'none' }}>
+                    Rp
+                  </span>
                 </div>
               </div>
 
