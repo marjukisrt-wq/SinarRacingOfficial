@@ -1,21 +1,22 @@
 const supabase = require("../config/supabase");
 
-// Helper untuk menormalisasi item transaksi agar nama mekanik & komisi selalu terbaca
+// Helper untuk menormalisasi item transaksi agar nama mekanik & persentase selalu terbaca
 const normalizeItems = (items) => {
   if (!Array.isArray(items)) return items;
   return items.map((it) => {
     if (it && it.is_service && it.brand_name && it.brand_name.startsWith("MEK:")) {
       const raw = it.brand_name.replace("MEK:", "").trim();
-      if (raw.includes("@")) {
-        const parts = raw.split("@");
-        if (!it.mechanic_name) it.mechanic_name = parts[0].trim();
-        it.mechanic_commission = Number(parts[1]) || 0;
-      } else if (raw.includes("#")) {
+      if (raw.includes("#")) {
         const parts = raw.split("#");
         if (!it.mechanic_name) it.mechanic_name = parts[0].trim();
-        it.mechanic_commission_rate = Number(parts[1]) || 0;
+        it.mechanic_rate = Number(parts[1]) || 50;
+      } else if (raw.includes("@")) {
+        const parts = raw.split("@");
+        if (!it.mechanic_name) it.mechanic_name = parts[0].trim();
+        it.mechanic_rate = 50;
       } else {
         if (!it.mechanic_name) it.mechanic_name = raw.trim();
+        it.mechanic_rate = 50;
       }
     }
     return it;
@@ -36,13 +37,13 @@ module.exports = {
     }
 
     // 2. Format & Simpan Seluruh Item (Sparepart + Jasa Servis)
-    // Nama mekanik dan komisi manual (Rp) di-backup ke brand_name (MEK:Nama@Komisi) agar tidak hilang jika kolom mechanic_name belum ada di tabel Supabase
+    // Nama mekanik dan pilihan persentase di-backup ke brand_name (MEK:Nama#Persen) agar tidak hilang jika kolom mechanic belum ada di Supabase
     const itemsToInsert = items.map((item) => {
       const mechName = (item.mechanic_name || "").trim();
-      const mechComm = Number(item.mechanic_commission || 0);
+      const rate = Number(item.mechanic_rate || 50);
       let brandVal = item.brand_name || null;
       if (item.is_service && mechName) {
-        brandVal = `MEK:${mechName}@${mechComm}`;
+        brandVal = rate !== 50 ? `MEK:${mechName}#${rate}` : `MEK:${mechName}`;
       }
       return {
         transaction_id: trx.id,
@@ -350,10 +351,10 @@ module.exports = {
 
     const itemsToInsert = items.map((item) => {
       const mechName = (item.mechanic_name || "").trim();
-      const mechComm = Number(item.mechanic_commission || 0);
+      const rate = Number(item.mechanic_rate || 50);
       let brandVal = item.brand_name || null;
       if (item.is_service && mechName) {
-        brandVal = `MEK:${mechName}@${mechComm}`;
+        brandVal = rate !== 50 ? `MEK:${mechName}#${rate}` : `MEK:${mechName}`;
       }
       return {
         transaction_id: realId,

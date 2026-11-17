@@ -50,6 +50,7 @@ export const normalizeCode = (str) => {
 export const findBestProductMatch = (targetCode, productList = []) => {
   if (!targetCode || !productList || productList.length === 0) return null;
   const rawTarget = String(targetCode).trim();
+  const lowerTarget = rawTarget.toLowerCase();
   const normTarget = normalizeCode(rawTarget);
 
   let bestProduct = null;
@@ -58,40 +59,51 @@ export const findBestProductMatch = (targetCode, productList = []) => {
   for (const p of productList) {
     if (!p) continue;
     const rawSku = String(p.sku || '').trim();
+    const lowerSku = rawSku.toLowerCase();
     const normSku = normalizeCode(rawSku);
-    const normName = normalizeCode(p.name);
+    const rawName = String(p.name || '').trim();
+    const lowerName = rawName.toLowerCase();
+    const normName = normalizeCode(rawName);
     let score = 0;
 
     // 1. Cocok ID produk
-    if (String(p.id).toLowerCase() === rawTarget.toLowerCase()) {
+    if (String(p.id).toLowerCase() === lowerTarget) {
       score = 100;
     }
     // 2. Cocok persis SKU asli
-    else if (rawSku && rawSku.toLowerCase() === rawTarget.toLowerCase()) {
+    else if (rawSku && lowerSku === lowerTarget) {
       score = 99;
     }
     // 3. Cocok persis SKU setelah normalisasi
     else if (normSku && normSku === normTarget) {
       score = 95;
     }
-    // 4. Barcode OEM Yamaha (12 digit akhiran 00, contoh: 3C1H21003000 vs 3C1-H2100-30 / 3C1H210030)
+    // 4. Cocok persis Nama barang
+    else if (lowerName === lowerTarget || (normName && normName === normTarget)) {
+      score = 94;
+    }
+    // 5. Barcode OEM Yamaha (12 digit akhiran 00, contoh: 3C1H21003000 vs 3C1-H2100-30 / 3C1H210030)
     else if (normTarget.length === 12 && normTarget.endsWith('00') && normTarget.slice(0, 10) === normSku) {
       score = 92;
     }
     else if (normSku.length === 12 && normSku.endsWith('00') && normSku.slice(0, 10) === normTarget) {
       score = 92;
     }
-    // 5. Awalan SKU cocok (minimal 6 digit karakter identik)
-    else if (normSku.length >= 6 && normTarget.length >= 6 && (normSku.startsWith(normTarget) || normTarget.startsWith(normSku))) {
-      score = 75;
+    // 6. Nama barang diawali kata kunci pencarian
+    else if (lowerName.startsWith(lowerTarget) || (normName && normTarget && normName.startsWith(normTarget))) {
+      score = 85;
     }
-    // 6. Nama barang mengandung kode barcode
-    else if (normName && normTarget.length >= 4 && normName.includes(normTarget)) {
-      score = 65;
+    // 7. Awalan SKU cocok (minimal 4 digit karakter identik)
+    else if (normSku.length >= 4 && normTarget.length >= 4 && (normSku.startsWith(normTarget) || normTarget.startsWith(normSku))) {
+      score = 80;
     }
-    // 7. Nama barang cocok dengan potongan OEM 8-10 karakter
-    else if (normName && normTarget.length >= 10 && normName.includes(normTarget.slice(0, 8))) {
-      score = 55;
+    // 8. Nama barang mengandung kata kunci pencarian (bisa nama pendek seperti "tes", "oli", "ban", "aki")
+    else if ((lowerName.includes(lowerTarget) || (normName && normTarget && normName.includes(normTarget))) && normTarget.length >= 2) {
+      score = 70;
+    }
+    // 9. Nama barang cocok dengan potongan OEM 8-10 karakter
+    else if (normName && normTarget.length >= 8 && normName.includes(normTarget.slice(0, 8))) {
+      score = 60;
     }
 
     if (score > highestScore) {
@@ -271,12 +283,23 @@ export const BarcodeScannerModal = ({
       const zxingReader = new MultiFormatReader();
       zxingReaderRef.current = zxingReader;
 
+      let nativeDetector = null;
+      if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+        try {
+          nativeDetector = new window.BarcodeDetector({
+            formats: ['code_39', 'code_128', 'ean_13', 'ean_8', 'data_matrix', 'qr_code', 'upc_a', 'upc_e', 'itf']
+          });
+        } catch (e) {
+          nativeDetector = null;
+        }
+      }
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       let frameCount = 0;
       let lastScanTimestamp = 0;
 
-      const tick = (timestamp) => {
+      const tick = async (timestamp) => {
         if (!streamRef.current || !videoRef.current) return;
 
         const video = videoRef.current;
@@ -286,20 +309,29 @@ export const BarcodeScannerModal = ({
             lastScanTimestamp = timestamp || Date.now();
             frameCount++;
             try {
+              // 1. Coba Native BarcodeDetector (Akselerasi Hardware GPU browser modern, sangat tangguh pada plastik berkerut/silau)
+              if (nativeDetector) {
+                try {
+                  const detectedBarcodes = await nativeDetector.detect(video);
+                  if (detectedBarcodes && detectedBarcodes.length > 0) {
+                    const rawVal = (detectedBarcodes[0].rawValue || '').trim();
+                    if (rawVal.length >= 3) {
+                      handleBarcodeFound(rawVal);
+                      return;
+                    }
+                  }
+                } catch (eNative) {}
+              }
+
+              // 2. Fallback ZXing Reader (Mempertahankan lebar penuh agar quiet-zone Code 39 tidak terpotong)
               const vw = video.videoWidth;
               const vh = video.videoHeight;
+              const targetW = Math.min(vw, 720);
+              const targetH = Math.round(targetW * (vh / vw));
 
-              // Memfokuskan pembacaan pada kotak merah di tengah (ROI: Region of Interest)
-              // Memaksimalkan ketajaman garis Code 39 pada kemasan motor
-              const isFullScan = frameCount % 3 === 0;
-              const roiW = isFullScan ? vw : Math.min(vw * 0.85, 640);
-              const roiH = isFullScan ? vh : Math.min(vh * 0.5, 360);
-              const sx = isFullScan ? 0 : (vw - roiW) / 2;
-              const sy = isFullScan ? 0 : (vh - roiH) / 2;
-
-              canvas.width = roiW;
-              canvas.height = roiH;
-              ctx.drawImage(video, sx, sy, roiW, roiH, 0, 0, roiW, roiH);
+              canvas.width = targetW;
+              canvas.height = targetH;
+              ctx.drawImage(video, 0, 0, targetW, targetH);
 
               const res = decodeCanvasWithZXing(canvas, zxingReader);
               if (res && res.getText()) {
@@ -336,33 +368,48 @@ export const BarcodeScannerModal = ({
       const img = new Image();
       img.src = fileUrl;
 
-      img.onload = () => {
+      img.onload = async () => {
         let detected = null;
         try {
-          const w = img.naturalWidth || img.width;
-          const h = img.naturalHeight || img.height;
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-
-          // 1. Coba decode gambar asli
-          try {
-            const res = decodeCanvasWithZXing(canvas, zxingReader);
-            if (res && res.getText()) detected = res.getText();
-          } catch (e1) {
-            // 2. Coba perjelas kontras jika kemasan plastik silau terkena lampu
+          // 1. Coba Native BarcodeDetector terlebih dahulu
+          if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
             try {
-              const c2 = document.createElement('canvas');
-              c2.width = w;
-              c2.height = h;
-              const ctx2 = c2.getContext('2d');
-              ctx2.filter = 'contrast(1.6) grayscale(1)';
-              ctx2.drawImage(img, 0, 0);
-              const res2 = decodeCanvasWithZXing(c2, zxingReader);
-              if (res2 && res2.getText()) detected = res2.getText();
-            } catch (e2) {}
+              const nativeDet = new window.BarcodeDetector({
+                formats: ['code_39', 'code_128', 'ean_13', 'ean_8', 'data_matrix', 'qr_code', 'upc_a', 'upc_e', 'itf']
+              });
+              const nativeRes = await nativeDet.detect(img);
+              if (nativeRes && nativeRes.length > 0) {
+                detected = (nativeRes[0].rawValue || '').trim();
+              }
+            } catch (eNative) {}
+          }
+
+          if (!detected) {
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            // 2. Coba decode gambar asli via ZXing
+            try {
+              const res = decodeCanvasWithZXing(canvas, zxingReader);
+              if (res && res.getText()) detected = res.getText();
+            } catch (e1) {
+              // 3. Coba perjelas kontras jika kemasan plastik silau terkena lampu
+              try {
+                const c2 = document.createElement('canvas');
+                c2.width = w;
+                c2.height = h;
+                const ctx2 = c2.getContext('2d');
+                ctx2.filter = 'contrast(1.6) grayscale(1)';
+                ctx2.drawImage(img, 0, 0);
+                const res2 = decodeCanvasWithZXing(c2, zxingReader);
+                if (res2 && res2.getText()) detected = res2.getText();
+              } catch (e2) {}
+            }
           }
         } catch (err) {
           console.error(err);
@@ -602,8 +649,9 @@ export const BarcodeScannerModal = ({
               {/* Target Aiming Box */}
               <div style={{
                 position: 'absolute',
-                width: '250px',
-                height: '145px',
+                width: '85%',
+                maxWidth: '320px',
+                height: '125px',
                 border: '2px solid #ef4444',
                 borderRadius: '12px',
                 boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.55), 0 0 15px rgba(239, 68, 68, 0.4)',
@@ -613,7 +661,7 @@ export const BarcodeScannerModal = ({
                 justifyContent: 'center',
               }}>
                 <div style={{
-                  width: '90%',
+                  width: '92%',
                   height: '2px',
                   background: '#ef4444',
                   boxShadow: '0 0 8px #ef4444',
@@ -754,7 +802,10 @@ export const BarcodeScannerModal = ({
             color: '#94a3b8',
             lineHeight: 1.45,
           }}>
-            <strong style={{ color: '#facc15', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IoBarcodeOutline size={14} /> Info Barcode Yamaha / Honda:</strong> Barcode resmi motor (Code 39) mengodekan nomor part tanpa tanda strip (misal: <code>3C1H21003000</code>). Sistem otomatis mengenali dan mencocokkannya ke kode part bertanda strip (<code>3C1-H2100-30</code>). Jika kemasan plastik berkerut atau silau, Anda bisa langsung ketik nomor part yang tertera lalu klik <strong>Pakai Kode</strong>.
+            <strong style={{ color: '#facc15', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              <IoBarcodeOutline size={14} /> Solusi Barcode Yamaha / Honda:
+            </strong>{' '}
+            Barcode resmi motor (Code 39) memang tidak mencetak angka di bawah garis barcode. Nomor part dicetak di <strong>kanan atas label</strong> (contoh: <code>3C1-H2100-30</code> atau <code>1S7-E2111-00</code>). Kamera otomatis membaca garis barcode, atau Anda bisa langsung ketik nomor part di kolom atas lalu klik <strong>Pakai Kode</strong>.
           </div>
 
           {products && products.length > 0 && mode !== 'CAPTURE_CODE' && (

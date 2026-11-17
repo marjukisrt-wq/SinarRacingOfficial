@@ -68,7 +68,7 @@ export const MechanicsView = () => {
     vehicle_plate: '',
     vehicle_model: '',
     price: 0,
-    commission: 0,
+    commission_rate: 50,
     date: new Date().toISOString().slice(0, 10),
     notes: '',
   });
@@ -191,7 +191,7 @@ export const MechanicsView = () => {
       vehicle_plate: '',
       vehicle_model: '',
       price: 0,
-      commission: 0,
+      commission_rate: 50,
       date: new Date().toISOString().slice(0, 10),
       notes: '',
     });
@@ -223,7 +223,7 @@ export const MechanicsView = () => {
         vehicle_plate: manualJobForm.vehicle_plate.trim().toUpperCase(),
         vehicle_model: manualJobForm.vehicle_model.trim(),
         price: numPrice,
-        commission: Number(manualJobForm.commission) || 0,
+        commission_rate: Number(manualJobForm.commission_rate) || 50,
         date: manualJobForm.date,
         notes: manualJobForm.notes.trim(),
       });
@@ -1295,40 +1295,20 @@ export const MechanicsView = () => {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="form-label" style={{ margin: 0 }}>Komisi Mekanik (Rp)</label>
-                    {Number(manualJobForm.price) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setManualJobForm(prev => ({ ...prev, commission: Math.round(Number(manualJobForm.price) * 0.5) }))}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#38bdf8',
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          textDecoration: 'underline'
-                        }}
-                      >
-                        Bagi 50% Otomatis
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ position: 'relative', marginTop: '0.25rem' }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="form-input"
-                      style={{ paddingLeft: '28px', fontFamily: 'var(--font-mono)', color: '#4ade80' }}
-                      placeholder="0"
-                      value={manualJobForm.commission !== undefined && manualJobForm.commission !== null && manualJobForm.commission !== '' ? formatRupiahInput(manualJobForm.commission) : ''}
-                      onChange={(e) => setManualJobForm(prev => ({ ...prev, commission: parseRupiahInput(e.target.value) }))}
-                    />
-                    <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#4ade80', fontWeight: 700, pointerEvents: 'none' }}>
-                      Rp
-                    </span>
-                  </div>
+                  <label className="form-label" style={{ margin: 0 }}>Bagi Hasil Jasa (%)</label>
+                  <select
+                    className="form-input"
+                    style={{ marginTop: '0.25rem', fontSize: '0.82rem', color: '#facc15', fontWeight: 700 }}
+                    value={manualJobForm.commission_rate}
+                    onChange={(e) => setManualJobForm(prev => ({ ...prev, commission_rate: Number(e.target.value) }))}
+                  >
+                    <option value="50">50% (Standar Bengkel 50/50)</option>
+                    <option value="40">40% (Mekanik 40%, Bengkel 60%)</option>
+                    <option value="60">60% (Mekanik 60%, Bengkel 40%)</option>
+                    <option value="70">70% (Mekanik 70%, Bengkel 30%)</option>
+                    <option value="100">100% (Mekanik 100%)</option>
+                    <option value="30">30% (Mekanik 30%, Bengkel 70%)</option>
+                  </select>
                 </div>
               </div>
 
@@ -1386,21 +1366,15 @@ export const MechanicsView = () => {
                     </strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: '#94a3b8' }}>Hak Komisi Mekanik:</span>
+                    <span style={{ color: '#94a3b8' }}>Hak Komisi Mekanik ({manualJobForm.commission_rate}%):</span>
                     <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
-                      Rp {Number(manualJobForm.commission || 0).toLocaleString('id-ID')}{' '}
-                      <span style={{ color: '#facc15' }}>
-                        ({Number(manualJobForm.price) > 0 ? Math.round((Number(manualJobForm.commission || 0) / Number(manualJobForm.price)) * 100) : 0}%)
-                      </span>
+                      Rp {Math.round((Number(manualJobForm.price) * (Number(manualJobForm.commission_rate) || 50)) / 100).toLocaleString('id-ID')}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '4px', marginTop: '4px' }}>
-                    <span style={{ color: '#94a3b8' }}>Bagian Kas Bengkel:</span>
+                    <span style={{ color: '#94a3b8' }}>Bagian Kas Bengkel ({100 - (Number(manualJobForm.commission_rate) || 50)}%):</span>
                     <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
-                      Rp {Math.max(0, Number(manualJobForm.price) - Number(manualJobForm.commission || 0)).toLocaleString('id-ID')}{' '}
-                      <span style={{ color: '#38bdf8' }}>
-                        ({Number(manualJobForm.price) > 0 ? 100 - Math.round((Number(manualJobForm.commission || 0) / Number(manualJobForm.price)) * 100) : 0}%)
-                      </span>
+                      Rp {(Number(manualJobForm.price) - Math.round((Number(manualJobForm.price) * (Number(manualJobForm.commission_rate) || 50)) / 100)).toLocaleString('id-ID')}
                     </strong>
                   </div>
                 </div>

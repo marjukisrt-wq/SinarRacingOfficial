@@ -7,33 +7,42 @@ const normalizeCode = (str) => {
 
 const findBestMatch = (targetCode, productList = []) => {
   if (!targetCode || !productList || productList.length === 0) return null;
-  const rawTarget = targetCode.trim();
+  const rawTarget = String(targetCode).trim();
+  const lowerTarget = rawTarget.toLowerCase();
   const normTarget = normalizeCode(rawTarget);
 
   let bestProduct = null;
   let highestScore = 0;
 
   for (const p of productList) {
-    const rawSku = (p.sku || "").trim();
+    if (!p) continue;
+    const rawSku = String(p.sku || "").trim();
+    const lowerSku = rawSku.toLowerCase();
     const normSku = normalizeCode(rawSku);
-    const normName = normalizeCode(p.name);
+    const rawName = String(p.name || "").trim();
+    const lowerName = rawName.toLowerCase();
+    const normName = normalizeCode(rawName);
     let score = 0;
 
-    if (String(p.id).toLowerCase() === rawTarget.toLowerCase()) {
+    if (String(p.id).toLowerCase() === lowerTarget) {
       score = 100;
-    } else if (rawSku && rawSku.toLowerCase() === rawTarget.toLowerCase()) {
+    } else if (rawSku && lowerSku === lowerTarget) {
       score = 99;
     } else if (normSku && normSku === normTarget) {
       score = 95;
+    } else if (lowerName === lowerTarget || (normName && normName === normTarget)) {
+      score = 94;
     } else if (normTarget.length === 12 && normTarget.endsWith("00") && normTarget.slice(0, 10) === normSku) {
       score = 90;
     } else if (normSku.length === 12 && normSku.endsWith("00") && normSku.slice(0, 10) === normTarget) {
       score = 90;
-    } else if (normSku.length >= 6 && normTarget.length >= 6 && (normSku.startsWith(normTarget) || normTarget.startsWith(normSku))) {
-      score = 75;
-    } else if (normName && normTarget.length >= 4 && normName.includes(normTarget)) {
-      score = 60;
-    } else if (normName && normTarget.length >= 10 && normName.includes(normTarget.slice(0, 8))) {
+    } else if (lowerName.startsWith(lowerTarget) || (normName && normTarget && normName.startsWith(normTarget))) {
+      score = 85;
+    } else if (normSku.length >= 4 && normTarget.length >= 4 && (normSku.startsWith(normTarget) || normTarget.startsWith(normSku))) {
+      score = 80;
+    } else if ((lowerName.includes(lowerTarget) || (normName && normTarget && normName.includes(normTarget))) && normTarget.length >= 2) {
+      score = 70;
+    } else if (normName && normTarget.length >= 8 && normName.includes(normTarget.slice(0, 8))) {
       score = 55;
     }
 
