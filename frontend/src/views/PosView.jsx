@@ -786,7 +786,6 @@ export const PosView = () => {
               setManualName('');
               setManualPrice('');
               setManualQty(1);
-              setManualRate(50);
               setManualMechanicId('');
               setManualMechanicName('');
               setShowManualModal(true);
@@ -1556,7 +1555,6 @@ export const PosView = () => {
                 setManualName('');
                 setManualPrice('');
                 setManualQty(1);
-                setManualRate(50);
                 setManualMechanicId('');
                 setManualMechanicName('');
                 setShowManualModal(true);
