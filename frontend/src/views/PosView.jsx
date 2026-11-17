@@ -1136,39 +1136,76 @@ export const PosView = () => {
                       </div>
 
                       {/* Input Komisi Manual Rupiah */}
-                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.72rem' }}>
-                        <span style={{ color: '#94a3b8' }}>Komisi:</span>
-                        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                          <span style={{ position: 'absolute', left: '5px', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, pointerEvents: 'none' }}>Rp</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={item.mechanic_commission !== undefined && item.mechanic_commission !== null ? formatRupiahInput(item.mechanic_commission) : ''}
-                            onChange={(e) => {
-                              const rawVal = parseRupiahInput(e.target.value);
-                              updateCartItemCommission(item.cart_item_id || item.product_id, rawVal);
-                            }}
-                            style={{
-                              width: '90px',
-                              padding: '2px 5px 2px 22px',
-                              fontSize: '0.72rem',
-                              background: '#090d16',
-                              border: '1px solid #334155',
+                      {(() => {
+                        const itemTotalPrice = (item.subtotal || item.unit_price * item.quantity || 0);
+                        const commVal = Number(item.mechanic_commission || 0);
+                        const commPercent = itemTotalPrice > 0 ? Math.round((commVal / itemTotalPrice) * 100) : 0;
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.72rem' }}>
+                            <span style={{ color: '#94a3b8' }}>Komisi:</span>
+                            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                              <span style={{ position: 'absolute', left: '5px', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, pointerEvents: 'none' }}>Rp</span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={item.mechanic_commission !== undefined && item.mechanic_commission !== null ? formatRupiahInput(item.mechanic_commission) : ''}
+                                onChange={(e) => {
+                                  const rawVal = parseRupiahInput(e.target.value);
+                                  updateCartItemCommission(item.cart_item_id || item.product_id, rawVal);
+                                }}
+                                style={{
+                                  width: '85px',
+                                  padding: '2px 5px 2px 22px',
+                                  fontSize: '0.72rem',
+                                  background: '#090d16',
+                                  border: '1px solid #334155',
+                                  borderRadius: '4px',
+                                  color: '#4ade80',
+                                  fontWeight: 700,
+                                  outline: 'none',
+                                  fontFamily: 'var(--font-mono)'
+                                }}
+                                title="Ketik nominal komisi untuk mekanik (Rp)"
+                              />
+                            </div>
+                            <span style={{
+                              background: 'rgba(250, 204, 21, 0.15)',
+                              color: '#facc15',
+                              padding: '1px 5px',
                               borderRadius: '4px',
-                              color: '#4ade80',
                               fontWeight: 700,
-                              outline: 'none',
-                              fontFamily: 'var(--font-mono)'
-                            }}
-                            title="Ketik nominal komisi untuk mekanik (Rp)"
-                          />
-                        </div>
-                        <span style={{ color: '#64748b', fontSize: '0.68rem' }}>• Hak Bengkel:</span>
-                        <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
-                          Rp {formatNumber(Math.max(0, (item.subtotal || item.unit_price) - (item.mechanic_commission || 0)))}
-                        </span>
-                      </div>
+                              fontSize: '0.7rem'
+                            }}>
+                              {commPercent}%
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const half = Math.round(itemTotalPrice * 0.5);
+                                updateCartItemCommission(item.cart_item_id || item.product_id, half);
+                              }}
+                              style={{
+                                background: 'rgba(56, 189, 248, 0.15)',
+                                border: '1px solid rgba(56, 189, 248, 0.35)',
+                                color: '#38bdf8',
+                                borderRadius: '4px',
+                                padding: '1px 5px',
+                                fontSize: '0.66rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                              title="Set komisi 50% otomatis"
+                            >
+                              50%
+                            </button>
+                            <span style={{ color: '#64748b', fontSize: '0.68rem' }}>• Hak Bengkel:</span>
+                            <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
+                              Rp {formatNumber(Math.max(0, itemTotalPrice - commVal))}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -2217,8 +2254,27 @@ export const PosView = () => {
 
                   {manualIsService && (
                     <div style={{ marginTop: '0.85rem' }}>
-                      <label className="form-label">Komisi Mekanik (Rp - Bebas Input)</label>
-                      <div style={{ position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="form-label" style={{ margin: 0 }}>Komisi Mekanik (Rp)</label>
+                        {manualPrice > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setManualCommission(Math.round(manualPrice * 0.5))}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#38bdf8',
+                              fontSize: '0.72rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Bagi 50% Otomatis
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ position: 'relative', marginTop: '0.25rem' }}>
                         <input
                           type="text"
                           inputMode="numeric"
@@ -2251,11 +2307,21 @@ export const PosView = () => {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                         <span>Komisi Mekanik:</span>
-                        <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>Rp {formatNumber(Number(manualCommission) || 0)}</strong>
+                        <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
+                          Rp {formatNumber(Number(manualCommission) || 0)}{' '}
+                          <span style={{ color: '#facc15' }}>
+                            ({manualPrice > 0 ? Math.round(((Number(manualCommission) || 0) / manualPrice) * 100) : 0}%)
+                          </span>
+                        </strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '3px', marginTop: '3px' }}>
                         <span>Hak / Kas Bengkel:</span>
-                        <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>Rp {formatNumber(Math.max(0, manualPrice - (Number(manualCommission) || 0)))}</strong>
+                        <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                          Rp {formatNumber(Math.max(0, manualPrice - (Number(manualCommission) || 0)))}{' '}
+                          <span style={{ color: '#38bdf8' }}>
+                            ({manualPrice > 0 ? 100 - Math.round(((Number(manualCommission) || 0) / manualPrice) * 100) : 0}%)
+                          </span>
+                        </strong>
                       </div>
                     </div>
                   )}

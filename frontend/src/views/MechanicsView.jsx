@@ -295,7 +295,7 @@ export const MechanicsView = () => {
           <div>
             <div><strong>Nama Mekanik:</strong> ${m.name}</div>
             <div><strong>No Kontak:</strong> ${m.phone || '-'}</div>
-            <div><strong>Sistem Komisi:</strong> Nominal Manual (Rp) / Fleksibel</div>
+            <div><strong>Bagi Hasil Jasa:</strong> ${m.total_revenue > 0 ? Math.round((m.total_commission / m.total_revenue) * 100) : (m.commission_rate || 50)}%</div>
           </div>
           <div style="text-align: right;">
             <div><strong>Periode:</strong> Bulan ${recapData?.period || selectedMonth}</div>
@@ -324,7 +324,10 @@ export const MechanicsView = () => {
                 <td>${j.vehicle_plate !== '-' ? j.vehicle_plate : ''} ${j.vehicle_model !== '-' ? `(${j.vehicle_model})` : ''}</td>
                 <td style="font-weight: 600;">${j.service_name}</td>
                 <td style="text-align: right; font-family: monospace;">Rp ${Number(j.subtotal || j.price).toLocaleString('id-ID')}</td>
-                <td style="text-align: right; font-weight: bold; color: #15803d; font-family: monospace;">Rp ${Number(j.commission).toLocaleString('id-ID')}</td>
+                <td style="text-align: right; font-weight: bold; color: #15803d; font-family: monospace;">
+                  Rp ${Number(j.commission).toLocaleString('id-ID')}
+                  <span style="font-size: 11px; color: #b45309; font-weight: normal;"> (${j.subtotal > 0 ? Math.round((Number(j.commission) / Number(j.subtotal)) * 100) : 0}%)</span>
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -607,7 +610,7 @@ export const MechanicsView = () => {
                     <tr style={{ background: '#0b1120', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       <th style={{ padding: '0.85rem 1rem' }}>Mekanik</th>
                       <th style={{ padding: '0.85rem 1rem' }}>No Kontak</th>
-                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Sistem Komisi</th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Bagi Hasil Jasa</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Jml Pekerjaan</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Total Jasa (Rp)</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Hak Komisi (Rp)</th>
@@ -626,14 +629,14 @@ export const MechanicsView = () => {
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <span style={{
-                            background: 'rgba(56, 189, 248, 0.15)',
-                            color: '#38bdf8',
-                            padding: '0.2rem 0.5rem',
+                            background: 'rgba(250, 204, 21, 0.15)',
+                            color: '#facc15',
+                            padding: '0.2rem 0.55rem',
                             borderRadius: '4px',
                             fontWeight: 700,
                             fontSize: '0.75rem',
                           }}>
-                            Manual (Rp)
+                            {m.total_revenue > 0 ? Math.round((m.total_commission / m.total_revenue) * 100) : (m.commission_rate || 50)}%
                           </span>
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center', fontWeight: 700, color: '#facc15' }}>
@@ -764,7 +767,7 @@ export const MechanicsView = () => {
                 <tr style={{ background: '#0b1120', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.75rem', textTransform: 'uppercase' }}>
                   <th style={{ padding: '0.85rem 1rem' }}>Nama Mekanik</th>
                   <th style={{ padding: '0.85rem 1rem' }}>No WhatsApp / Telepon</th>
-                  <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Sistem Komisi</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Bagi Hasil Jasa</th>
                   <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Aksi</th>
                 </tr>
@@ -787,7 +790,7 @@ export const MechanicsView = () => {
                         fontWeight: 700,
                         fontSize: '0.75rem',
                       }}>
-                        Manual (Rp) / Bebas
+                        {m.commission_rate || 50}%
                       </span>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
@@ -1062,7 +1065,10 @@ export const MechanicsView = () => {
                         Rp {Number(j.subtotal).toLocaleString('id-ID')}
                       </td>
                       <td style={{ padding: '0.5rem', textAlign: 'right', fontFamily: 'var(--font-mono)', color: '#4ade80', fontWeight: 700 }}>
-                        Rp {Number(j.commission).toLocaleString('id-ID')}
+                        Rp {Number(j.commission).toLocaleString('id-ID')}{' '}
+                        <span style={{ fontSize: '0.72rem', color: '#facc15', fontWeight: 600 }}>
+                          ({j.subtotal > 0 ? Math.round((Number(j.commission) / Number(j.subtotal)) * 100) : 0}%)
+                        </span>
                       </td>
                       <td style={{ padding: '0.5rem', textAlign: 'center' }}>
                         {j.invoice_number?.startsWith('MAN-') && (
@@ -1289,8 +1295,27 @@ export const MechanicsView = () => {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Komisi Mekanik (Rp)</label>
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Komisi Mekanik (Rp)</label>
+                    {Number(manualJobForm.price) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setManualJobForm(prev => ({ ...prev, commission: Math.round(Number(manualJobForm.price) * 0.5) }))}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#38bdf8',
+                          fontSize: '0.72rem',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        Bagi 50% Otomatis
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ position: 'relative', marginTop: '0.25rem' }}>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1363,13 +1388,19 @@ export const MechanicsView = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ color: '#94a3b8' }}>Hak Komisi Mekanik:</span>
                     <strong style={{ color: '#4ade80', fontFamily: 'var(--font-mono)' }}>
-                      Rp {Number(manualJobForm.commission || 0).toLocaleString('id-ID')}
+                      Rp {Number(manualJobForm.commission || 0).toLocaleString('id-ID')}{' '}
+                      <span style={{ color: '#facc15' }}>
+                        ({Number(manualJobForm.price) > 0 ? Math.round((Number(manualJobForm.commission || 0) / Number(manualJobForm.price)) * 100) : 0}%)
+                      </span>
                     </strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '4px', marginTop: '4px' }}>
                     <span style={{ color: '#94a3b8' }}>Bagian Kas Bengkel:</span>
                     <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
-                      Rp {Math.max(0, Number(manualJobForm.price) - Number(manualJobForm.commission || 0)).toLocaleString('id-ID')}
+                      Rp {Math.max(0, Number(manualJobForm.price) - Number(manualJobForm.commission || 0)).toLocaleString('id-ID')}{' '}
+                      <span style={{ color: '#38bdf8' }}>
+                        ({Number(manualJobForm.price) > 0 ? 100 - Math.round((Number(manualJobForm.commission || 0) / Number(manualJobForm.price)) * 100) : 0}%)
+                      </span>
                     </strong>
                   </div>
                 </div>
