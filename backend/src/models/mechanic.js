@@ -149,7 +149,7 @@ module.exports = {
             .insert([{
               name: mechanicData.name,
               phone: mechanicData.phone || "",
-              commission_rate: Number(mechanicData.commission_rate) || 50,
+              commission_rate: (mechanicData.commission_rate !== undefined && mechanicData.commission_rate !== null && !isNaN(mechanicData.commission_rate)) ? Number(mechanicData.commission_rate) : 50,
               is_active: true,
             }])
             .select()
@@ -171,7 +171,7 @@ module.exports = {
       id: newId,
       name: mechanicData.name,
       phone: mechanicData.phone || "",
-      commission_rate: Number(mechanicData.commission_rate) || 50,
+      commission_rate: (mechanicData.commission_rate !== undefined && mechanicData.commission_rate !== null && !isNaN(mechanicData.commission_rate)) ? Number(mechanicData.commission_rate) : 50,
       is_active: true,
       created_at: new Date().toISOString(),
     };
@@ -289,7 +289,7 @@ module.exports = {
         id: m.id,
         name: m.name,
         phone: m.phone || "",
-        commission_rate: Number(m.commission_rate) || 50,
+        commission_rate: (m.commission_rate !== undefined && m.commission_rate !== null && !isNaN(m.commission_rate)) ? Number(m.commission_rate) : 50,
         total_services: 0,
         total_revenue: 0,
         total_commission: 0,
@@ -334,7 +334,8 @@ module.exports = {
           if (rawMek.includes("#")) {
             const parts = rawMek.split("#");
             if (!mechName) mechName = parts[0].trim();
-            customRate = Number(parts[1]) || null;
+            const rNum = Number(parts[1]);
+            customRate = !isNaN(rNum) ? rNum : null;
           } else if (rawMek.includes("@")) {
             const parts = rawMek.split("@");
             if (!mechName) mechName = parts[0].trim();
@@ -361,7 +362,10 @@ module.exports = {
         }
 
         const mObj = mechanicMap[key];
-        const commRate = customRate !== null ? customRate : (mObj.commission_rate !== undefined ? mObj.commission_rate : 50);
+        // Jika mekanik terdaftar di master Data Mekanik, utamakan persentase yang diset oleh admin
+        const commRate = (mObj.id && mObj.commission_rate !== undefined)
+          ? mObj.commission_rate
+          : (customRate !== null ? customRate : (mObj.commission_rate !== undefined ? mObj.commission_rate : 50));
         const commissionAmount = Math.round((servicePrice * commRate) / 100);
         const workshopShare = servicePrice - commissionAmount;
 

@@ -40,7 +40,7 @@ module.exports = {
     // Nama mekanik dan pilihan persentase di-backup ke brand_name (MEK:Nama#Persen) agar tidak hilang jika kolom mechanic belum ada di Supabase
     const itemsToInsert = items.map((item) => {
       const mechName = (item.mechanic_name || "").trim();
-      const rate = Number(item.mechanic_rate || 50);
+      const rate = (item.mechanic_rate !== undefined && item.mechanic_rate !== null && !isNaN(item.mechanic_rate)) ? Number(item.mechanic_rate) : 50;
       let brandVal = item.brand_name || null;
       if (item.is_service && mechName) {
         brandVal = rate !== 50 ? `MEK:${mechName}#${rate}` : `MEK:${mechName}`;
@@ -351,7 +351,7 @@ module.exports = {
 
     const itemsToInsert = items.map((item) => {
       const mechName = (item.mechanic_name || "").trim();
-      const rate = Number(item.mechanic_rate || 50);
+      const rate = (item.mechanic_rate !== undefined && item.mechanic_rate !== null && !isNaN(item.mechanic_rate)) ? Number(item.mechanic_rate) : 50;
       let brandVal = item.brand_name || null;
       if (item.is_service && mechName) {
         brandVal = rate !== 50 ? `MEK:${mechName}#${rate}` : `MEK:${mechName}`;

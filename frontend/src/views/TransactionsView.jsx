@@ -238,7 +238,8 @@ export const TransactionsView = ({ onNavigateToPos }) => {
           if (item.brand_name && item.brand_name.startsWith('MEK:')) {
             const rawMek = item.brand_name.replace('MEK:', '').trim();
             if (rawMek.includes('#')) {
-              const rate = Number(rawMek.split('#')[1]) || 50;
+              const r = Number(rawMek.split('#')[1]);
+              const rate = !isNaN(r) ? r : 50;
               mechCommission = Math.round((itemSubtotal * rate) / 100);
             } else if (rawMek.includes('@')) {
               const val = Number(rawMek.split('@')[1]);
@@ -247,7 +248,8 @@ export const TransactionsView = ({ onNavigateToPos }) => {
               mechCommission = Math.round(itemSubtotal * 0.5);
             }
           } else if (item.mechanic_name) {
-            const rate = Number(item.mechanic_rate) || 50;
+            const r = Number(item.mechanic_rate);
+            const rate = (item.mechanic_rate !== undefined && item.mechanic_rate !== null && !isNaN(r)) ? r : 50;
             mechCommission = Math.round((itemSubtotal * rate) / 100);
           }
           profitJasa += Math.max(0, itemProfit - mechCommission);
@@ -285,7 +287,8 @@ export const TransactionsView = ({ onNavigateToPos }) => {
         if (item.brand_name && item.brand_name.startsWith('MEK:')) {
           const rawMek = item.brand_name.replace('MEK:', '').trim();
           if (rawMek.includes('#')) {
-            const rate = Number(rawMek.split('#')[1]) || 50;
+            const r = Number(rawMek.split('#')[1]);
+            const rate = !isNaN(r) ? r : 50;
             mechCommission = Math.round((itemSubtotal * rate) / 100);
           } else if (rawMek.includes('@')) {
             const val = Number(rawMek.split('@')[1]);
@@ -294,7 +297,8 @@ export const TransactionsView = ({ onNavigateToPos }) => {
             mechCommission = Math.round(itemSubtotal * 0.5);
           }
         } else if (item.mechanic_name) {
-          const rate = Number(item.mechanic_rate) || 50;
+          const r = Number(item.mechanic_rate);
+          const rate = (item.mechanic_rate !== undefined && item.mechanic_rate !== null && !isNaN(r)) ? r : 50;
           mechCommission = Math.round((itemSubtotal * rate) / 100);
         }
         profitJasa += Math.max(0, itemProfit - mechCommission);

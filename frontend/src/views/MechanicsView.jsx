@@ -118,7 +118,7 @@ export const MechanicsView = () => {
       setFormData({
         name: mechanic.name,
         phone: mechanic.phone || '',
-        commission_rate: mechanic.commission_rate || 50,
+        commission_rate: (mechanic.commission_rate !== undefined && mechanic.commission_rate !== null) ? Number(mechanic.commission_rate) : 50,
       });
     } else {
       setFormData({ name: '', phone: '', commission_rate: 50 });
@@ -299,7 +299,7 @@ export const MechanicsView = () => {
           <div>
             <div><strong>Nama Mekanik:</strong> ${m.name}</div>
             <div><strong>No Kontak:</strong> ${m.phone || '-'}</div>
-            <div><strong>Bagi Hasil Jasa:</strong> ${m.total_revenue > 0 ? Math.round((m.total_commission / m.total_revenue) * 100) : (m.commission_rate || 50)}%</div>
+            <div><strong>Bagi Hasil Jasa:</strong> ${m.total_revenue > 0 ? Math.round((m.total_commission / m.total_revenue) * 100) : (m.commission_rate !== undefined ? m.commission_rate : 50)}%</div>
           </div>
           <div style="text-align: right;">
             <div><strong>Periode:</strong> Bulan ${recapData?.period || selectedMonth}</div>
@@ -640,7 +640,7 @@ export const MechanicsView = () => {
                             fontWeight: 700,
                             fontSize: '0.75rem',
                           }}>
-                            {m.total_revenue > 0 ? Math.round((m.total_commission / m.total_revenue) * 100) : (m.commission_rate || 50)}%
+                            {m.total_revenue > 0 ? Math.round((m.total_commission / m.total_revenue) * 100) : (m.commission_rate !== undefined ? m.commission_rate : 50)}%
                           </span>
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center', fontWeight: 700, color: '#facc15' }}>
@@ -794,7 +794,7 @@ export const MechanicsView = () => {
                         fontWeight: 700,
                         fontSize: '0.75rem',
                       }}>
-                        {m.commission_rate || 50}%
+                        {m.commission_rate !== undefined ? m.commission_rate : 50}%
                       </span>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>

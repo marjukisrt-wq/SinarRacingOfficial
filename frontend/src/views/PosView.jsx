@@ -361,7 +361,7 @@ export const PosView = () => {
       notes: notes || '',
       items: cart.map((item) => {
         const mechName = (item.mechanic_name || '').trim();
-        const rate = Number(item.mechanic_rate || 50);
+        const rate = (item.mechanic_rate !== undefined && item.mechanic_rate !== null && !isNaN(item.mechanic_rate)) ? Number(item.mechanic_rate) : 50;
         return {
           product_id: item.product_id || null,
           product_name: item.product_name,
@@ -419,13 +419,14 @@ export const PosView = () => {
 
     const loadedItems = (draft.items || []).map((it) => {
       let mechName = it.mechanic_name || '';
-      let mechRate = Number(it.mechanic_rate || 50);
+      let mechRate = (it.mechanic_rate !== undefined && it.mechanic_rate !== null && !isNaN(it.mechanic_rate)) ? Number(it.mechanic_rate) : 50;
       if (it.brand_name && it.brand_name.startsWith('MEK:')) {
         const raw = it.brand_name.replace('MEK:', '').trim();
         if (raw.includes('#')) {
           const parts = raw.split('#');
           if (!mechName) mechName = parts[0].trim();
-          mechRate = Number(parts[1]) || 50;
+          const rNum = Number(parts[1]);
+          mechRate = !isNaN(rNum) ? rNum : 50;
         } else if (raw.includes('@')) {
           const parts = raw.split('@');
           if (!mechName) mechName = parts[0].trim();
@@ -534,7 +535,7 @@ export const PosView = () => {
         notes: finalNotes,
         items: cart.map((it) => {
           const mechName = (it.mechanic_name || '').trim();
-          const rate = Number(it.mechanic_rate || 50);
+          const rate = (it.mechanic_rate !== undefined && it.mechanic_rate !== null && !isNaN(it.mechanic_rate)) ? Number(it.mechanic_rate) : 50;
           return {
             ...it,
             brand_name: (it.is_service && mechName) ? (rate !== 50 ? `MEK:${mechName}#${rate}` : `MEK:${mechName}`) : (it.brand_name || null),
@@ -646,11 +647,12 @@ export const PosView = () => {
       prev.map((item) => {
         const match = (item.cart_item_id && item.cart_item_id === identifier) || item.product_id === identifier;
         if (match) {
+          const fallbackRate = (item.mechanic_rate !== undefined && item.mechanic_rate !== null) ? item.mechanic_rate : 50;
           return {
             ...item,
             mechanic_id: mechanicId,
             mechanic_name: mechanicName,
-            mechanic_rate: mechanicRate !== null ? mechanicRate : (item.mechanic_rate || 50),
+            mechanic_rate: mechanicRate !== null ? mechanicRate : fallbackRate,
           };
         }
         return item;
@@ -1085,11 +1087,14 @@ export const PosView = () => {
                                   setCustomMechanicRows(prev => ({ ...prev, [item.cart_item_id || item.product_id]: true }));
                                 } else {
                                   const found = mechanics.find(m => m.name === val);
+                                  const effectiveRate = found
+                                    ? ((found.commission_rate !== undefined && found.commission_rate !== null) ? Number(found.commission_rate) : 50)
+                                    : ((item.mechanic_rate !== undefined && item.mechanic_rate !== null) ? Number(item.mechanic_rate) : 50);
                                   updateCartItemMechanic(
                                     item.cart_item_id || item.product_id,
                                     found ? found.id : null,
                                     val,
-                                    found ? (found.commission_rate || 50) : (item.mechanic_rate || 50)
+                                    effectiveRate
                                   );
                                 }
                               }}
@@ -1140,7 +1145,7 @@ export const PosView = () => {
                             border: '1px solid rgba(56, 189, 248, 0.25)',
                             fontWeight: 600,
                           }} title="Bagi hasil otomatis sesuai pengaturan admin">
-                            {item.mechanic_rate || 50}%
+                            {(item.mechanic_rate !== undefined && item.mechanic_rate !== null) ? item.mechanic_rate : 50}%
                           </span>
                         )}
                       </div>
